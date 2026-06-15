@@ -1980,7 +1980,7 @@ void App::applyPausedTouchGesture(const TouchEvent &event, uint32_t nowMs) {
 #endif
   };
 
-  const auto isSettingsSwipeFromBottomCenter = [&](int deltaX, int deltaY) {
+  const auto isMenuSwipeFromBottomEdge = [&](int deltaX, int deltaY) {
 #if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
     constexpr int kStartEdgeBandPx = 84;
     constexpr int kMinInwardSwipePx = 46;
@@ -2057,12 +2057,11 @@ void App::applyPausedTouchGesture(const TouchEvent &event, uint32_t nowMs) {
       static_cast<int>(pausedTouch_.startY) <= maxCenterY;
 #endif
 
-  if (isSettingsSwipeFromBottomCenter(deltaX, deltaY)) {
+  if (isMenuSwipeFromBottomEdge(deltaX, deltaY)) {
     pausedTouch_.active = false;
     pausedTouchIntent_ = TouchIntent::None;
     touchPlayHeld_ = false;
     openMainMenu(nowMs);
-    openSettings();
     return;
   }
 
