@@ -8,6 +8,7 @@
 #include "storage/fs/StorageFiles.h"
 #include "storage/fs/StoragePaths.h"
 #include "storage/index/IndexedBook.h"
+#include "storage/SeedBooks.h"
 
 #ifndef RSVP_ON_DEVICE_EPUB_CONVERSION
 #define RSVP_ON_DEVICE_EPUB_CONVERSION 0
@@ -45,6 +46,10 @@ bool StorageManager::begin() {
         Serial.printf("[storage] SD initialized (%llu MB, %d kHz)\n", sizeMb, mountedFrequencyKhz);
         statusCallback_(statusContext_, "SD", "Scanning books", "EPUB converts on open", 10);
         refreshBookPaths(false);
+        if (library_.paths.empty() && seedDemoBooksIfNeeded()) {
+            statusCallback_(statusContext_, "SD", "Seeding books", "Built-in demo books", 15);
+            refreshBookPaths(false);
+        }
         return true;
     }
 
