@@ -2230,18 +2230,25 @@ void App::updateBatteryRuntimeLabel(uint32_t nowMs) {
 }
 
 bool App::isFooterMetricTap(uint16_t x, uint16_t y) const {
-  return x >= Board::Config::DISPLAY_WIDTH - kReaderChromeMarginXPx - kFooterMetricTapWidthPx &&
-         y >= Board::Config::DISPLAY_HEIGHT - kReaderChromeBottomMarginPx - kFooterMetricTapHeightPx;
+  return false;
 }
 
 bool App::isBatteryBadgeTap(uint16_t x, uint16_t y) const {
-  return x >= Board::Config::DISPLAY_WIDTH - kReaderBatteryMarginXPx - kBatteryBadgeTapWidthPx &&
-         y <= kReaderBatteryTopMarginPx + kBatteryBadgeTapHeightPx;
+  return false;
 }
 
 bool App::isPreviousSentenceTap(uint16_t x, uint16_t y) const {
   return x <= kReaderChromeMarginXPx + kPreviousSentenceTapWidthPx &&
          y <= kReaderChromeTopMarginPx + kPreviousSentenceTapHeightPx;
+}
+
+bool App::isWpmSwipeTap(uint16_t y) const {
+  const uint16_t topBound =
+      kReaderChromeTopMarginPx + (Board::Config::ENABLE_TOP_EDGE_MENU_SWIPE ? 64 : 0);
+  const uint16_t bottomBound =
+      Board::Config::DISPLAY_HEIGHT - kReaderChromeBottomMarginPx -
+      (Board::Config::ENABLE_BOTTOM_EDGE_QUICK_SETTINGS_SWIPE ? 64 : 0);
+  return y >= topBound && y <= bottomBound;
 }
 
 bool App::isActivelyReading() const { return state_ == AppState::Playing; }
@@ -2525,7 +2532,8 @@ void App::applyPausedTouchGesture(const TouchEvent &event, uint32_t nowMs) {
                absDeltaY > absDeltaX + static_cast<int>(kAxisBiasPx)) {
       pausedTouchIntent_ = TouchIntent::BrowseScroll;
     } else if (!previewBrowseMode && absDeltaY >= static_cast<int>(kSwipeThresholdPx) &&
-               absDeltaY > absDeltaX + static_cast<int>(kAxisBiasPx)) {
+               absDeltaY > absDeltaX + static_cast<int>(kAxisBiasPx) &&
+               isWpmSwipeTap(pausedTouch_.startY)) {
       pausedTouchIntent_ = TouchIntent::Wpm;
     }
   }

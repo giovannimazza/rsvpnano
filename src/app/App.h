@@ -232,6 +232,7 @@ class App {
   bool isFooterMetricTap(uint16_t x, uint16_t y) const;
   bool isBatteryBadgeTap(uint16_t x, uint16_t y) const;
   bool isPreviousSentenceTap(uint16_t x, uint16_t y) const;
+  bool isWpmSwipeTap(uint16_t y) const;
   bool isActivelyReading() const;
   bool readerFooterVisible() const;
   DisplayManager::ReaderChrome readerChrome() const;
