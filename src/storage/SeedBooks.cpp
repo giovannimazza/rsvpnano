@@ -94,6 +94,16 @@ bool removePreviousSeededFiles(const String &markerContents) {
   return true;
 }
 
+bool allSeededFilesPresent() {
+  for (size_t i = 0; i < kSeedBookCount; ++i) {
+    if (!StorageFiles::fileExistsWithBytes(kSeededBooks[i].path)) {
+      Serial.printf("[seed-books] missing seeded file: %s\n", kSeededBooks[i].path);
+      return false;
+    }
+  }
+  return true;
+}
+
 bool writeMarker() {
   File file = SD_MMC.open(kSeedMarkerPath, FILE_WRITE);
   if (!file) {
@@ -118,7 +128,7 @@ bool seedDemoBooksIfNeeded() {
   if (hasMarker) {
     const int newlineIndex = markerContents.indexOf('\n');
     const String markerHash = newlineIndex >= 0 ? markerContents.substring(0, newlineIndex) : markerContents;
-    if (markerHash == kSeedManifestHash) {
+    if (markerHash == kSeedManifestHash && allSeededFilesPresent()) {
       return false;
     }
   }
