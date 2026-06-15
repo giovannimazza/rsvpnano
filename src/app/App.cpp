@@ -2604,7 +2604,7 @@ bool App::handleTopEdgeMenuSwipe(const TouchEvent &event, uint32_t nowMs, int de
 
   pausedTouch_.active = false;
   pausedTouchIntent_ = TouchIntent::None;
-  openMainMenu(nowMs);
+  openQuickSettings(nowMs);
   Serial.printf("[touch] top-edge menu swipe x=%u y=%u dy=%d\n", event.x, event.y, deltaY);
   return true;
 }
@@ -2628,14 +2628,8 @@ bool App::handleBottomEdgeQuickSettingsSwipe(const TouchEvent &event, uint32_t n
 
   pausedTouch_.active = false;
   pausedTouchIntent_ = TouchIntent::None;
-#if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
   openMainMenu(nowMs);
   Serial.printf("[touch] bottom-edge menu swipe x=%u y=%u dy=%d\n", event.x, event.y, deltaY);
-#else
-  openQuickSettings(nowMs);
-  Serial.printf("[touch] bottom-edge quick settings swipe x=%u y=%u dy=%d\n", event.x, event.y,
-                deltaY);
-#endif
   return true;
 }
 
