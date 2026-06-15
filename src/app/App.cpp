@@ -228,14 +228,12 @@ enum QuickSettingsItem : size_t {
   QuickSettingsTheme,
   QuickSettingsFocusTimer,
   QuickSettingsSync,
-  QuickSettingsBack,
   QuickSettingsItemCount,
 };
 
 enum QuickSyncItem : size_t {
   QuickSyncWifi,
   QuickSyncUsb,
-  QuickSyncBack,
   QuickSyncItemCount,
 };
 
@@ -3377,9 +3375,6 @@ void App::selectQuickSettingsItem(uint32_t nowMs) {
     case QuickSettingsSync:
       openQuickSync();
       return;
-    case QuickSettingsBack:
-      setState(AppState::Paused, nowMs);
-      return;
     default:
       return;
   }
@@ -3399,9 +3394,6 @@ void App::selectQuickSyncItem(uint32_t nowMs) {
       return;
     case QuickSyncUsb:
       enterUsbTransfer(nowMs);
-      return;
-    case QuickSyncBack:
-      openQuickSettings(nowMs);
       return;
     default:
       return;
@@ -6444,7 +6436,6 @@ void App::renderQuickSettings() {
   items.push_back(String("Theme: ") + themeModeLabel());
   items.push_back("Focus Timer");
   items.push_back("Sync");
-  items.push_back("Back");
   display_.renderMenu(items, quickSettingsSelectedIndex_);
 }
 
@@ -6453,7 +6444,6 @@ void App::renderQuickSync() {
   items.reserve(QuickSyncItemCount);
   items.push_back("Wi-Fi Sync");
   items.push_back("USB Sync");
-  items.push_back("Back");
   display_.renderMenu(items, quickSyncSelectedIndex_);
 }
 
