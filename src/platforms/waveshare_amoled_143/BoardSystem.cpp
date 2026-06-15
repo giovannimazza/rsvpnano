@@ -27,10 +27,13 @@ void pulseDirectTouchResetPin(uint32_t lowDelayMs, uint32_t highDelayMs) {
   }
 
   pinMode(Config::PIN_TOUCH_RST, OUTPUT);
-  digitalWrite(Config::PIN_TOUCH_RST, LOW);
-  delay(lowDelayMs);
+  // Match the legacy 1.43 startup sequence (HIGH -> LOW -> HIGH).
   digitalWrite(Config::PIN_TOUCH_RST, HIGH);
-  delay(highDelayMs);
+  delay(5);
+  digitalWrite(Config::PIN_TOUCH_RST, LOW);
+  delay(lowDelayMs > 0 ? lowDelayMs : 10);
+  digitalWrite(Config::PIN_TOUCH_RST, HIGH);
+  delay(highDelayMs > 0 ? highDelayMs : 50);
 }
 
 }  // namespace
@@ -54,17 +57,23 @@ void begin() {
     digitalWrite(Config::PIN_LCD_BACKLIGHT, LOW);
   }
 
+  const bool sharedTouchAndAuxI2c = Config::PIN_TOUCH_SDA == Config::PIN_I2C_SDA &&
+                                    Config::PIN_TOUCH_SCL == Config::PIN_I2C_SCL;
+  const bool hasTca9554 = Config::TCA9554_ADDRESS >= 0;
+
   if (Config::TOUCH_USES_WIRE1) {
     beginWire(Wire1, Config::PIN_TOUCH_SDA, Config::PIN_TOUCH_SCL, Config::TOUCH_I2C_CLOCK_HZ,
               Config::TOUCH_I2C_TIMEOUT_MS);
   } else {
     beginWire(Wire, Config::PIN_TOUCH_SDA, Config::PIN_TOUCH_SCL, Config::TOUCH_I2C_CLOCK_HZ,
               Config::TOUCH_I2C_TIMEOUT_MS);
+    if (sharedTouchAndAuxI2c && !hasTca9554) {
+      Serial.println("[board] Touch and auxiliary I2C share the same pins; using single Wire bus");
+    }
   }
 
   if (!Config::TOUCH_USES_WIRE1 && Config::PIN_I2C_SDA >= 0 && Config::PIN_I2C_SCL >= 0 &&
-      (Config::PIN_I2C_SDA != Config::PIN_TOUCH_SDA ||
-       Config::PIN_I2C_SCL != Config::PIN_TOUCH_SCL)) {
+      (hasTca9554 || !sharedTouchAndAuxI2c)) {
     beginWire(Wire1, Config::PIN_I2C_SDA, Config::PIN_I2C_SCL, Config::SYSTEM_I2C_CLOCK_HZ,
               Config::SYSTEM_I2C_TIMEOUT_MS);
   }
@@ -98,7 +107,7 @@ void holdBacklightOffForDeepSleep() {
 
 void resetWakePeripherals() { Board::Power::resetWakePeripherals(); }
 
-void resetTouchController() { pulseDirectTouchResetPin(12, 12); }
+void resetTouchController() { pulseDirectTouchResetPin(10, 50); }
 
 void deepSleepUntilConfiguredWake() {
   const int wakePin = Config::PIN_DEEP_SLEEP_WAKE;
