@@ -39,20 +39,20 @@ bool StorageManager::begin() {
     listedOnce_ = false;
     clearBookCache();
 
-    statusCallback_(statusContext_, "SD", "Mounting card", "", 5);
+    statusCallback_(statusContext_, "Storage", "Initializing storage", "", 5);
     int mountedFrequencyKhz = 0;
     if (SdDiagnostics::mountCard(mounted_, &mountedFrequencyKhz)) {
         const uint64_t sizeMb = SD_MMC.cardSize() / kBytesPerMegabyte;
-        Serial.printf("[storage] SD initialized (%llu MB, %d kHz)\n", sizeMb, mountedFrequencyKhz);
+        Serial.printf("[storage] storage initialized (%llu MB, %d kHz)\n", sizeMb, mountedFrequencyKhz);
         if (seedDemoBooksIfNeeded()) {
-            statusCallback_(statusContext_, "SD", "Seeding books", "Built-in demo books", 15);
+            statusCallback_(statusContext_, "Storage", "Seeding books", "Built-in demo books", 15);
         }
-        statusCallback_(statusContext_, "SD", "Scanning books", "EPUB converts on open", 10);
+        statusCallback_(statusContext_, "Storage", "Scanning books", "EPUB converts on open", 10);
         refreshBookPaths(false);
         return true;
     }
 
-    Serial.println("[storage] SD init failed after retries");
+    Serial.println("[storage] storage init failed after retries");
     return false;
 }
 
@@ -114,8 +114,8 @@ String StorageManager::bookAuthorName(size_t index) const {
 bool StorageManager::loadIndexedBook(size_t index, IndexedBookStore& store, BookMetadata& metadata,
                                      const IndexedBookLoadOptions& options) {
     if (!mounted_) {
-        Serial.println("[storage] SD not mounted, cannot load indexed book");
-        statusCallback_(statusContext_, "Book open failed", "SD not mounted", "Check card", 100);
+        Serial.println("[storage] storage not mounted, cannot load indexed book");
+        statusCallback_(statusContext_, "Book open failed", "Storage not ready", "Check storage", 100);
         return false;
     }
 
