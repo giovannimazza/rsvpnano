@@ -1692,17 +1692,38 @@ void App::updateWpmFeedback(uint32_t nowMs) {
 void App::resetReaderTapTracking() { lastReaderTapValid_ = false; }
 
 bool App::isFooterMetricTap(uint16_t x, uint16_t y) const {
+#if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
+  const int centerX = BoardConfig::DISPLAY_WIDTH / 2;
+  const int bandHalfWidth = std::max(32, BoardConfig::DISPLAY_WIDTH / 5);
+  return y >= BoardConfig::DISPLAY_HEIGHT - kFooterMetricTapHeightPx &&
+         abs(static_cast<int>(x) - centerX) <= bandHalfWidth;
+#else
   return x >= BoardConfig::DISPLAY_WIDTH - kFooterMetricTapWidthPx &&
          y >= BoardConfig::DISPLAY_HEIGHT - kFooterMetricTapHeightPx;
+#endif
 }
 
 bool App::isBatteryBadgeTap(uint16_t x, uint16_t y) const {
+#if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
+  const int centerX = BoardConfig::DISPLAY_WIDTH / 2;
+  const int bandHalfWidth = std::max(34, BoardConfig::DISPLAY_WIDTH / 5);
+  return y <= kBatteryBadgeTapHeightPx &&
+         abs(static_cast<int>(x) - centerX) <= bandHalfWidth;
+#else
   return x >= BoardConfig::DISPLAY_WIDTH - kBatteryBadgeTapWidthPx &&
          y <= kBatteryBadgeTapHeightPx;
+#endif
 }
 
 bool App::isPreviousSentenceTap(uint16_t x, uint16_t y) const {
+#if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
+  const uint16_t minY = static_cast<uint16_t>(BoardConfig::DISPLAY_HEIGHT / 5);
+  const uint16_t maxY = static_cast<uint16_t>((BoardConfig::DISPLAY_HEIGHT * 4) / 5);
+  const uint16_t leftBand = static_cast<uint16_t>(std::max(28, BoardConfig::DISPLAY_WIDTH / 8));
+  return x <= leftBand && y >= minY && y <= maxY;
+#else
   return x < kPreviousSentenceTapWidthPx && y < kPreviousSentenceTapHeightPx;
+#endif
 }
 
 bool App::isActivelyReading() const { return state_ == AppState::Playing; }
@@ -1943,12 +1964,26 @@ void App::handleTouch(uint32_t nowMs) {
 }
 
 void App::applyPausedTouchGesture(const TouchEvent &event, uint32_t nowMs) {
-  const auto isMenuHotCornerTap = [&](bool tapLike) {
+  const auto isSettingsSwipeFromBottomCenter = [&](int deltaX, int deltaY, bool ended) {
 #if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
-    constexpr uint16_t kMenuHotCornerPx = 56;
-    return tapLike && event.x <= kMenuHotCornerPx && event.y <= kMenuHotCornerPx;
+    if (!ended) {
+      return false;
+    }
+    constexpr int kStartBottomBandPx = 72;
+    constexpr int kCenterBandHalfWidthPx = 72;
+    constexpr int kMinSwipeUpPx = 58;
+    const int centerX = BoardConfig::DISPLAY_WIDTH / 2;
+    const bool startedFromBottomBand =
+        static_cast<int>(pausedTouch_.startY) >= BoardConfig::DISPLAY_HEIGHT - kStartBottomBandPx;
+    const bool startedFromBottomCenter =
+        abs(static_cast<int>(pausedTouch_.startX) - centerX) <= kCenterBandHalfWidthPx;
+    const bool mostlyVertical = abs(deltaX) <= kTapSlopPx * 2;
+    return startedFromBottomBand && startedFromBottomCenter && mostlyVertical &&
+           (-deltaY) >= kMinSwipeUpPx;
 #else
-    (void)tapLike;
+    (void)deltaX;
+    (void)deltaY;
+    (void)ended;
     return false;
 #endif
   };
@@ -2003,15 +2038,24 @@ void App::applyPausedTouchGesture(const TouchEvent &event, uint32_t nowMs) {
     if (ended) {
       pausedTouch_.active = false;
       pausedTouchIntent_ = TouchIntent::None;
+      if (isSettingsSwipeFromBottomCenter(deltaX, deltaY, ended)) {
+        openMainMenu(nowMs);
+        openSettings();
+        return;
+      }
       if (tapLike) {
-        if (isMenuHotCornerTap(tapLike)) {
-          openMainMenu(nowMs);
-          return;
-        }
         if (handleBatteryBadgeTap(event.x, event.y, nowMs)) {
           return;
         }
         if (handleFooterMetricTap(event.x, event.y, nowMs)) {
+          return;
+        }
+
+        if (isSettingsSwipeFromBottomCenter(deltaX, deltaY, ended)) {
+          pausedTouch_.active = false;
+          pausedTouchIntent_ = TouchIntent::None;
+          openMainMenu(nowMs);
+          openSettings();
           return;
         }
         if (handlePreviousSentenceTap(event.x, event.y, nowMs)) {
@@ -2095,10 +2139,6 @@ void App::applyPausedTouchGesture(const TouchEvent &event, uint32_t nowMs) {
   if (ended) {
     pausedTouch_.active = false;
     pausedTouchIntent_ = TouchIntent::None;
-    if (isMenuHotCornerTap(tapLike)) {
-      openMainMenu(nowMs);
-      return;
-    }
     if (tapLike && handleBatteryBadgeTap(event.x, event.y, nowMs)) {
       return;
     }
