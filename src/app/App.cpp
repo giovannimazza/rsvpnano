@@ -364,7 +364,7 @@ constexpr size_t kTypographyPreviewWordCount =
     sizeof(kTypographyPreviewWords) / sizeof(kTypographyPreviewWords[0]);
 constexpr size_t kWifiPasswordMaxLength = 63;
 constexpr uint16_t kKeyboardMarginX = 8;
-constexpr uint16_t kKeyboardTopY = 48;
+constexpr uint16_t kKeyboardTopY = Board::Config::DISPLAY_WIDTH == Board::Config::DISPLAY_HEIGHT ? 76 : 48;
 constexpr uint16_t kKeyboardRowGap = 4;
 constexpr uint16_t kKeyboardRowHeight = 27;
 
