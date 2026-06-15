@@ -144,9 +144,6 @@ enum MenuItem : size_t {
   MenuSdCardCheck,
   MenuRssFeeds,
   MenuCompanionSync,
-#if RSVP_USB_TRANSFER_ENABLED
-  MenuUsbTransfer,
-#endif
   MenuPowerOff,
   MenuItemCount,
 };
@@ -233,7 +230,6 @@ enum QuickSettingsItem : size_t {
 
 enum QuickSyncItem : size_t {
   QuickSyncWifi,
-  QuickSyncUsb,
   QuickSyncItemCount,
 };
 
@@ -3137,8 +3133,7 @@ bool App::moveMenuSelection(int direction, bool wrap) {
     }
     Serial.printf("[quick] selected=%s\n", selectedLabel.c_str());
   } else if (menuScreen_ == MenuScreen::QuickSync) {
-    const String selectedLabel =
-        quickSyncSelectedIndex_ == QuickSyncWifi ? "Wi-Fi Sync" : "USB Sync";
+    const String selectedLabel = "Wi-Fi Sync";
     Serial.printf("[quick] sync selected=%s\n", selectedLabel.c_str());
   } else if (menuScreen_ == MenuScreen::FocusTimerGenres) {
     Serial.printf("[timer] selected genre=%s\n",
@@ -3197,11 +3192,6 @@ bool App::moveMenuSelection(int direction, bool wrap) {
         case MenuCompanionSync:
           selectedLabel = "Companion sync";
           break;
-#if RSVP_USB_TRANSFER_ENABLED
-        case MenuUsbTransfer:
-          selectedLabel = uiText(UiText::UsbTransfer);
-          break;
-#endif
         case MenuPowerOff:
           selectedLabel = uiText(UiText::PowerOff);
           break;
@@ -3313,11 +3303,6 @@ void App::selectMenuItem(uint32_t nowMs) {
     case MenuRssFeeds:
       runRssFeedCheck(nowMs);
       return;
-#if RSVP_USB_TRANSFER_ENABLED
-    case MenuUsbTransfer:
-      enterUsbTransfer(nowMs);
-      return;
-#endif
     case MenuChapters:
       openChapterPicker();
       return;
@@ -3391,9 +3376,6 @@ void App::selectQuickSyncItem(uint32_t nowMs) {
   switch (quickSyncSelectedIndex_) {
     case QuickSyncWifi:
       enterCompanionSync(nowMs);
-      return;
-    case QuickSyncUsb:
-      enterUsbTransfer(nowMs);
       return;
     default:
       return;
@@ -6314,9 +6296,6 @@ void App::renderMainMenu() {
   items.push_back("SD card check");
   items.push_back("RSS feeds");
   items.push_back("Companion sync");
-#if RSVP_USB_TRANSFER_ENABLED
-  items.push_back(uiText(UiText::UsbTransfer));
-#endif
   items.push_back(uiText(UiText::PowerOff));
   display_.renderMenu(items, menuSelectedIndex_);
 }
@@ -6443,7 +6422,6 @@ void App::renderQuickSync() {
   std::vector<String> items;
   items.reserve(QuickSyncItemCount);
   items.push_back("Wi-Fi Sync");
-  items.push_back("USB Sync");
   display_.renderMenu(items, quickSyncSelectedIndex_);
 }
 
