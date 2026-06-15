@@ -7,6 +7,8 @@ static_assert(sizeof(IndexedBookStore::Header) == 52, "RIDX header size changed"
 static_assert(sizeof(IndexedBookStore::WordRecord) == 8, "RIDX word record size changed");
 static_assert(sizeof(IndexedBookStore::ChapterRecord) == 72, "RIDX chapter record size changed");
 
+constexpr size_t IndexedBookStore::kWordCacheSize;
+
 bool IndexedBookStore::open(const String &indexPath, const String &dataPath,
                             const Header &header) {
   if (header.magic != kMagic || header.version != kVersion ||
