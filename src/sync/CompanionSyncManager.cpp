@@ -669,6 +669,13 @@ bool CompanionSyncManager::startAccessPoint() {
 
 bool CompanionSyncManager::startServer() {
   server_.on("/", HTTP_GET, handleRootStatic);
+  server_.on("/generate_204", HTTP_GET, handleRootStatic);
+  server_.on("/gen_204", HTTP_GET, handleRootStatic);
+  server_.on("/hotspot-detect.html", HTTP_GET, handleRootStatic);
+  server_.on("/library/test/success.html", HTTP_GET, handleRootStatic);
+  server_.on("/connecttest.txt", HTTP_GET, handleRootStatic);
+  server_.on("/ncsi.txt", HTTP_GET, handleRootStatic);
+  server_.on("/fwlink", HTTP_GET, handleRootStatic);
   server_.on("/api/info", HTTP_GET, handleInfoStatic);
   server_.on("/api/books", HTTP_GET, handleBooksListStatic);
   server_.on("/api/books", HTTP_DELETE, handleBookDeleteStatic);
