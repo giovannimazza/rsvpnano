@@ -85,9 +85,23 @@ bool removePathIfExists(const String &path) {
   return true;
 }
 
+bool removeSeedArtifactsForPath(const String &path) {
+  const String epubPath = StoragePaths::epubSiblingPathForRsvp(path);
+  const String indexPath = StoragePaths::indexedIndexPathFor(path);
+  const String dataPath = StoragePaths::indexedDataPathFor(path);
+  const String tempPath = StoragePaths::indexedTempPathFor(path);
+  const String failedPath = path + StoragePaths::kFailedExtension;
+  const String convertingPath = path + StoragePaths::kConvertingExtension;
+
+  return removePathIfExists(path) && removePathIfExists(epubPath) &&
+         removePathIfExists(indexPath) && removePathIfExists(dataPath) &&
+         removePathIfExists(tempPath) && removePathIfExists(failedPath) &&
+         removePathIfExists(convertingPath);
+}
+
 bool removePreviousSeededFiles(const String &markerContents) {
   for (const String &path : parseMarkedPaths(markerContents)) {
-    if (!removePathIfExists(path)) {
+    if (!removeSeedArtifactsForPath(path)) {
       return false;
     }
   }
@@ -145,7 +159,8 @@ bool seedDemoBooksIfNeeded() {
   }
 
   for (size_t i = 0; i < kSeedBookCount; ++i) {
-    if (!writeTextFile(kSeededBooks[i].path, kSeededBooks[i].contents)) {
+    if (!removeSeedArtifactsForPath(kSeededBooks[i].path) ||
+        !writeTextFile(kSeededBooks[i].path, kSeededBooks[i].contents)) {
       return false;
     }
   }
