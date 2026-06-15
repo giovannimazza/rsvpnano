@@ -3,6 +3,8 @@ Import("env")
 import os
 import subprocess
 
+from SCons.Script import Action
+
 
 def upload_filesystem(source, target, env):
     if env["PIOENV"] != "waveshare_esp32s3_touch_amoled_143c":
@@ -19,4 +21,4 @@ def upload_filesystem(source, target, env):
 
 
 if os.environ.get("RSVP_SKIP_AUTO_UPLOADFS") != "1":
-    env.AddPreAction("upload", upload_filesystem)
+    env.AddPreAction("upload", Action(upload_filesystem))
