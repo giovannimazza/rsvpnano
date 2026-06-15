@@ -282,6 +282,22 @@ namespace SdDiagnostics {
             return true;
         }
 
+        // On boards without an SD card, mount internal flash directly via the filesystem shim.
+        if (Board::Config::PIN_SD_CLK < 0) {
+            mounted = SD_MMC.begin();
+            if (!mounted) {
+                Serial.println("[sd-check] internal flash mount failed");
+                return false;
+            }
+            ensureLibraryFolderLayout();
+            sMountedFrequencyKhz = 0;
+            if (mountedFrequencyKhz != nullptr) {
+                *mountedFrequencyKhz = 0;
+            }
+            Serial.println("[sd-check] internal flash mounted");
+            return true;
+        }
+
         if (!SD_MMC.setPins(Board::Config::PIN_SD_CLK, Board::Config::PIN_SD_CMD, Board::Config::PIN_SD_D0)) {
             Serial.println("[sd-check] SD_MMC pin setup failed");
             return false;
