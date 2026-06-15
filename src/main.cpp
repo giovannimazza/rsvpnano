@@ -2,7 +2,7 @@
 #include <esp_log.h>
 
 #include "app/App.h"
-#include "board/BoardConfig.h"
+#include "board/Board.h"
 
 App app;
 
@@ -10,11 +10,12 @@ void setup() {
   Serial.begin(115200);
   esp_log_level_set("*", ESP_LOG_INFO);
   delay(50);
-  BoardConfig::begin();
+  Board::System::begin();
   const uint32_t serialWaitStart = millis();
   while (!Serial && millis() - serialWaitStart < 2000) {
     delay(10);
   }
+  Board::System::logStartupDiagnostics();
   Serial.println("[main] app setup");
   app.begin();
 }
@@ -22,4 +23,5 @@ void setup() {
 void loop() {
   const uint32_t now = millis();
   app.update(now);
+  delay(1);
 }
