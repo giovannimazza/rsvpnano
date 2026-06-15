@@ -88,14 +88,7 @@ enum MenuItem : size_t {
   MenuChapters,
   MenuBooks,
   MenuArticles,
-  MenuFocusTimer,
   MenuSettings,
-  MenuSdCardCheck,
-  MenuRssFeeds,
-  MenuCompanionSync,
-#if RSVP_USB_TRANSFER_ENABLED
-  MenuUsbTransfer,
-#endif
   MenuPowerOff,
   MenuItemCount,
 };
@@ -2588,26 +2581,9 @@ void App::moveMenuSelection(int direction) {
       case MenuArticles:
         selectedLabel = "Articles";
         break;
-      case MenuFocusTimer:
-        selectedLabel = "Focus Timer";
-        break;
       case MenuSettings:
         selectedLabel = uiText(UiText::Settings);
         break;
-      case MenuSdCardCheck:
-        selectedLabel = "SD card check";
-        break;
-      case MenuRssFeeds:
-        selectedLabel = "RSS feeds";
-        break;
-      case MenuCompanionSync:
-        selectedLabel = "Companion sync";
-        break;
-#if RSVP_USB_TRANSFER_ENABLED
-      case MenuUsbTransfer:
-        selectedLabel = uiText(UiText::UsbTransfer);
-        break;
-#endif
       case MenuPowerOff:
         selectedLabel = uiText(UiText::PowerOff);
         break;
@@ -2667,20 +2643,6 @@ void App::selectMenuItem(uint32_t nowMs) {
     case MenuPowerOff:
       enterPowerOff(nowMs);
       return;
-    case MenuCompanionSync:
-      enterCompanionSync(nowMs);
-      return;
-    case MenuSdCardCheck:
-      runSdCardCheck(nowMs);
-      return;
-    case MenuRssFeeds:
-      runRssFeedCheck(nowMs);
-      return;
-#if RSVP_USB_TRANSFER_ENABLED
-    case MenuUsbTransfer:
-      enterUsbTransfer(nowMs);
-      return;
-#endif
     case MenuChapters:
       openChapterPicker();
       return;
@@ -2689,9 +2651,6 @@ void App::selectMenuItem(uint32_t nowMs) {
       return;
     case MenuArticles:
       openBookPicker(true);
-      return;
-    case MenuFocusTimer:
-      openFocusTimer();
       return;
     case MenuSettings:
       openSettings();
@@ -5180,14 +5139,7 @@ void App::renderMainMenu() {
   items.push_back(uiText(UiText::Chapters));
   items.push_back("Books");
   items.push_back("Articles");
-  items.push_back("Focus Timer");
   items.push_back(uiText(UiText::Settings));
-  items.push_back("SD card check");
-  items.push_back("RSS feeds");
-  items.push_back("Companion sync");
-#if RSVP_USB_TRANSFER_ENABLED
-  items.push_back(uiText(UiText::UsbTransfer));
-#endif
   items.push_back(uiText(UiText::PowerOff));
   display_.renderMenu(items, menuSelectedIndex_);
 }
