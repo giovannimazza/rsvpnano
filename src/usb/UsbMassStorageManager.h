@@ -11,7 +11,6 @@
 #include <USBMSC.h>
 #endif
 
-#include <esp_partition.h>
 #include <driver/sdmmc_types.h>
 
 class UsbMassStorageManager {
@@ -37,8 +36,6 @@ class UsbMassStorageManager {
   int32_t readSectors(uint32_t lba, uint32_t offset, void *buffer, uint32_t bufsize);
   int32_t writeSectors(uint32_t lba, uint32_t offset, uint8_t *buffer, uint32_t bufsize);
   bool handleStartStop(uint8_t powerCondition, bool start, bool loadEject);
-  bool beginFlashStorage();
-  void endFlashStorage();
 
   static UsbMassStorageManager *instance_;
 
@@ -47,12 +44,9 @@ class UsbMassStorageManager {
 #endif
 
   sdmmc_card_t card_ = {};
-  const esp_partition_t *flashPartition_ = nullptr;
   uint8_t *sectorBuffer_ = nullptr;
-  uint8_t *flashPageBuffer_ = nullptr;
   uint32_t blockCount_ = 0;
   uint16_t blockSize_ = 512;
-  uint32_t flashEraseSize_ = 4096;
   bool active_ = false;
   bool cardReady_ = false;
   bool ejected_ = false;

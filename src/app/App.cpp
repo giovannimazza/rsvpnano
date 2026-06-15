@@ -5537,7 +5537,7 @@ void App::enterUsbTransfer(uint32_t nowMs) {
   storage_.end();
   if (!usbTransfer_.begin(true)) {
     Serial.printf("[app] USB transfer failed: %s\n", usbTransfer_.statusMessage());
-    display_.renderStatus("USB", "Storage not ready", "Returning");
+    display_.renderStatus("USB", "SD not ready", "Returning");
     storageReady_ = storage_.begin();
     if (storageReady_ && usingStorageBook_ && !currentBookPath_.isEmpty()) {
       const int refreshedBookIndex = findBookIndexByPath(currentBookPath_);
@@ -5584,12 +5584,8 @@ void App::updateUsbTransfer(uint32_t nowMs) {
 }
 
 void App::exitUsbTransfer(uint32_t nowMs) {
-  Serial.println("[app] USB transfer ejected; remounting storage");
-#if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
-  display_.renderStatus("USB", "Remounting flash", "");
-#else
+  Serial.println("[app] USB transfer ejected; remounting SD");
   display_.renderStatus("USB", "Remounting SD", "");
-#endif
   usbTransfer_.end();
 
   storageReady_ = storage_.begin();
@@ -5616,7 +5612,7 @@ void App::exitUsbTransfer(uint32_t nowMs) {
       loadBookAtIndex(0, nowMs);
     }
   } else {
-    Serial.println("[app] storage remount failed after USB transfer");
+    Serial.println("[app] SD remount failed after USB transfer");
   }
 
   menuScreen_ = MenuScreen::Main;
