@@ -1723,12 +1723,14 @@ void DisplayManager::drawEdgeMenuHints(int logicalWidth, int logicalHeight,
 }
 
 void DisplayManager::drawFooter(const String &chapterLabel, const String &statusLabel,
-                                const ReaderChrome &chrome) {
+                                const ReaderChrome &chrome, int footerY) {
   if (!chrome.showChapter && !chrome.showProgress) {
     return;
   }
 
-  const int y = kDisplayHeight - kTinyGlyphHeight * kTinyScale - kReaderChromeMarginBottom;
+  const int y = footerY >= 0 ? footerY
+                             : (kDisplayHeight - kTinyGlyphHeight * kTinyScale -
+                                kReaderChromeMarginBottom);
   int maxChapterWidth = kDisplayWidth - (kReaderChromeMarginX * 2);
 
   if (chrome.showProgress) {
@@ -2001,15 +2003,9 @@ void DisplayManager::renderRsvpWord(const String &word, const String &chapterLab
   const int focusIndex = findFocusLetterIndex(word);
   const int x = rsvpStartX(word, focusIndex, virtualWidth, 1, false);
   const int anchorX = (virtualWidth * currentAnchorPercent()) / 100;
-
   clearVirtualBuffer(virtualWidth, virtualHeight);
   drawRsvpAnchorGuide(anchorX, y, glyphHeight);
   drawRsvpWordAt(word, x, y, focusIndex);
-  if (showFooter) {
-    drawFooter(chapterLabel, footerStatusLabel.isEmpty() ? String(progressPercent) + "%"
-                                                         : footerStatusLabel,
-               chrome);
-  }
   if (chrome.showPreviousSentenceHint) {
     drawPreviousSentenceHint();
   }
@@ -2046,16 +2042,10 @@ void DisplayManager::renderRsvpWordWithWpm(const String &word, uint16_t wpm,
   const int focusIndex = findFocusLetterIndex(word);
   const int x = rsvpStartX(word, focusIndex, virtualWidth, 1, false);
   const int anchorX = (virtualWidth * currentAnchorPercent()) / 100;
-
   clearVirtualBuffer(virtualWidth, virtualHeight);
   drawRsvpAnchorGuide(anchorX, wordY, glyphHeight);
   drawRsvpWordAt(word, x, wordY, focusIndex);
   drawTinyTextCentered(wpmText, wpmY, focusColor(), kTinyScale);
-  if (showFooter) {
-    drawFooter(chapterLabel, footerStatusLabel.isEmpty() ? String(progressPercent) + "%"
-                                                         : footerStatusLabel,
-               chrome);
-  }
   if (chrome.showPreviousSentenceHint) {
     drawPreviousSentenceHint();
   }
@@ -2094,7 +2084,6 @@ void DisplayManager::renderPhantomRsvpWord(const String &beforeText, const Strin
     const int anchorX = (virtualWidth * currentAnchorPercent()) / 100;
     const TextLayoutMetrics currentLayout = serif70WordLayout(word, focusIndex);
     const uint16_t phantomColor = blendOverBackground(wordColor(), kPhantomAlphaMedium);
-
     clearVirtualBuffer(virtualWidth, virtualHeight);
     drawRsvpAnchorGuide(anchorX, textY, mediumHeight);
     if (!beforeText.isEmpty()) {
@@ -2109,11 +2098,6 @@ void DisplayManager::renderPhantomRsvpWord(const String &beforeText, const Strin
       const int afterX =
           currentX + currentLayout.maxX + kPhantomCurrentGapMedium - afterLayout.minX;
       drawSerif70TextAt(afterText, afterX, textY, phantomColor);
-    }
-    if (showFooter) {
-      drawFooter(chapterLabel, footerStatusLabel.isEmpty() ? String(progressPercent) + "%"
-                                                           : footerStatusLabel,
-                 chrome);
     }
     if (chrome.showPreviousSentenceHint) {
       drawPreviousSentenceHint();
@@ -2140,7 +2124,6 @@ void DisplayManager::renderPhantomRsvpWord(const String &beforeText, const Strin
   const TextLayoutMetrics currentLayout =
       serifWordLayoutScaledPercent(word, focusIndex, style.scalePercent);
   const uint16_t phantomColor = blendOverBackground(wordColor(), style.alpha);
-
   clearVirtualBuffer(virtualWidth, virtualHeight);
   drawRsvpAnchorGuide(anchorX, textY, textHeight);
   if (!beforeText.isEmpty()) {
@@ -2155,11 +2138,6 @@ void DisplayManager::renderPhantomRsvpWord(const String &beforeText, const Strin
         serifWordLayoutScaledPercent(afterText, -1, style.scalePercent);
     const int afterX = currentX + currentLayout.maxX + style.currentGap - afterLayout.minX;
     drawSerifTextScaledAt(afterText, afterX, textY, phantomColor, style.scalePercent);
-  }
-  if (showFooter) {
-    drawFooter(chapterLabel, footerStatusLabel.isEmpty() ? String(progressPercent) + "%"
-                                                         : footerStatusLabel,
-               chrome);
   }
   if (chrome.showPreviousSentenceHint) {
     drawPreviousSentenceHint();
@@ -2297,9 +2275,6 @@ void DisplayManager::renderWordTickerView(const std::vector<ContextWord> &words,
     if (!overlayText.isEmpty()) {
       drawTinyTextCentered(overlayText, overlayY, focusColor(), kTinyScale);
     }
-    if (showFooter) {
-      drawFooter(chapterLabel, String(progressPercent) + "%", chrome);
-    }
     if (chrome.showPreviousSentenceHint) {
       drawPreviousSentenceHint();
     }
@@ -2383,9 +2358,6 @@ void DisplayManager::renderWordTickerView(const std::vector<ContextWord> &words,
   }
   if (!overlayText.isEmpty()) {
     drawTinyTextCentered(overlayText, overlayY, focusColor(), kTinyScale);
-  }
-  if (showFooter) {
-    drawFooter(chapterLabel, String(progressPercent) + "%", chrome);
   }
   if (chrome.showPreviousSentenceHint) {
     drawPreviousSentenceHint();
@@ -2554,11 +2526,6 @@ void DisplayManager::renderPhantomRsvpWordWithWpm(const String &beforeText, cons
       drawSerif70TextAt(afterText, afterX, textY, phantomColor);
     }
     drawTinyTextCentered(wpmText, wpmY, focusColor(), kTinyScale);
-    if (showFooter) {
-      drawFooter(chapterLabel, footerStatusLabel.isEmpty() ? String(progressPercent) + "%"
-                                                           : footerStatusLabel,
-                 chrome);
-    }
     if (chrome.showPreviousSentenceHint) {
       drawPreviousSentenceHint();
     }
@@ -2603,11 +2570,6 @@ void DisplayManager::renderPhantomRsvpWordWithWpm(const String &beforeText, cons
     drawSerifTextScaledAt(afterText, afterX, textY, phantomColor, style.scalePercent);
   }
   drawTinyTextCentered(wpmText, wpmY, focusColor(), kTinyScale);
-  if (showFooter) {
-    drawFooter(chapterLabel, footerStatusLabel.isEmpty() ? String(progressPercent) + "%"
-                                                         : footerStatusLabel,
-               chrome);
-  }
   if (chrome.showPreviousSentenceHint) {
     drawPreviousSentenceHint();
   }
@@ -2639,11 +2601,8 @@ void DisplayManager::renderScrollView(const std::vector<ContextWord> &words, uin
   const int virtualWidth = kDisplayWidth;
   const int virtualHeight = kDisplayHeight;
   const int overlayReserve = overlayText.isEmpty() ? 0 : (kTinyGlyphHeight * kTinyScale + 6);
-  const bool showFooterRow = chrome.showChapter || chrome.showProgress;
-  const int footerReserve =
-      showFooterRow ? (kTinyGlyphHeight * kTinyScale + kReaderChromeMarginBottom + 6) : 6;
   const int textTop = kScrollTop;
-  const int textBottom = virtualHeight - footerReserve - overlayReserve;
+  const int textBottom = virtualHeight - overlayReserve - 6;
   const ReaderTypeface contextTypeface = currentReaderTypeface();
   const int contextGlyphHeight = std::max(
       1, (baseGlyphHeightForTypeface(contextTypeface) + kScrollSerifDivisor - 1) /
@@ -2791,9 +2750,6 @@ void DisplayManager::renderScrollView(const std::vector<ContextWord> &words, uin
                          focusColor(), kTinyScale);
   }
 
-  drawFooter(chapterLabel, footerStatusLabel.isEmpty() ? String(progressPercent) + "%"
-                                                       : footerStatusLabel,
-             chrome);
   if (chrome.showPreviousSentenceHint) {
     drawPreviousSentenceHint();
   }

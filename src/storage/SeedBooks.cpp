@@ -15,6 +15,7 @@ namespace {
 constexpr const char *kSeedMarkerPath = "/config/.seed-books-v1";
 
 bool writeTextFile(const char *path, const char *contents) {
+  SD_MMC.remove(path);
   errno = 0;
   File file = SD_MMC.open(path, FILE_WRITE);
   if (!file) {
