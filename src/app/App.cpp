@@ -1969,17 +1969,32 @@ void App::applyPausedTouchGesture(const TouchEvent &event, uint32_t nowMs) {
     if (!ended) {
       return false;
     }
-    constexpr int kStartBottomBandPx = 72;
-    constexpr int kCenterBandHalfWidthPx = 72;
-    constexpr int kMinSwipeUpPx = 58;
+    constexpr int kStartEdgeBandPx = 84;
+    constexpr int kCenterBandHalfWidthPx = 92;
+    constexpr int kMinInwardSwipePx = 46;
     const int centerX = BoardConfig::DISPLAY_WIDTH / 2;
+    const int centerY = BoardConfig::DISPLAY_HEIGHT / 2;
     const bool startedFromBottomBand =
-        static_cast<int>(pausedTouch_.startY) >= BoardConfig::DISPLAY_HEIGHT - kStartBottomBandPx;
+        static_cast<int>(pausedTouch_.startY) >= BoardConfig::DISPLAY_HEIGHT - kStartEdgeBandPx;
     const bool startedFromBottomCenter =
         abs(static_cast<int>(pausedTouch_.startX) - centerX) <= kCenterBandHalfWidthPx;
-    const bool mostlyVertical = abs(deltaX) <= kTapSlopPx * 2;
-    return startedFromBottomBand && startedFromBottomCenter && mostlyVertical &&
-           (-deltaY) >= kMinSwipeUpPx;
+    const bool startedFromRightBand =
+        static_cast<int>(pausedTouch_.startX) >= BoardConfig::DISPLAY_WIDTH - kStartEdgeBandPx;
+    const bool startedFromLeftBand = static_cast<int>(pausedTouch_.startX) <= kStartEdgeBandPx;
+    const bool startedFromMidHeight =
+        abs(static_cast<int>(pausedTouch_.startY) - centerY) <= kCenterBandHalfWidthPx;
+
+    const bool upwardFromBottom =
+        startedFromBottomBand && startedFromBottomCenter && abs(deltaX) <= kTapSlopPx * 3 &&
+        (-deltaY) >= kMinInwardSwipePx;
+    const bool inwardFromRight =
+        startedFromRightBand && startedFromMidHeight && abs(deltaY) <= kTapSlopPx * 3 &&
+        (-deltaX) >= kMinInwardSwipePx;
+    const bool inwardFromLeft =
+        startedFromLeftBand && startedFromMidHeight && abs(deltaY) <= kTapSlopPx * 3 &&
+        deltaX >= kMinInwardSwipePx;
+
+    return upwardFromBottom || inwardFromRight || inwardFromLeft;
 #else
     (void)deltaX;
     (void)deltaY;
