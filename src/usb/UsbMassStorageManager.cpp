@@ -6,9 +6,14 @@
 #include <esp_err.h>
 #include <esp_heap_caps.h>
 #include <esp_log.h>
+#include <esp_partition.h>
 #include <sdmmc_cmd.h>
 #include <tusb.h>
 #include <driver/sdmmc_host.h>
+
+#if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
+#include <FFat.h>
+#endif
 
 #include "board/BoardConfig.h"
 
@@ -59,10 +64,10 @@ bool UsbMassStorageManager::begin(bool writeEnabled) {
 
   writeEnabled_ = writeEnabled;
   ejected_ = false;
-  statusMessage_ = "Preparing SD";
+  statusMessage_ = "Preparing storage";
 
   if (!beginSdCard()) {
-    statusMessage_ = "SD init failed";
+    statusMessage_ = "Storage init failed";
     endSdCard();
     return false;
   }
@@ -115,7 +120,7 @@ const char *UsbMassStorageManager::statusMessage() const { return statusMessage_
 bool UsbMassStorageManager::configureMsc() {
 #if RSVP_USB_TRANSFER_ENABLED && CONFIG_TINYUSB_MSC_ENABLED && !ARDUINO_USB_MODE
   msc_.vendorID("RSVPNANO");
-  msc_.productID("SD Transfer");
+  msc_.productID("File Transfer");
   msc_.productRevision("0.1");
   msc_.onRead(onRead);
   msc_.onWrite(onWrite);
@@ -128,6 +133,40 @@ bool UsbMassStorageManager::configureMsc() {
 }
 
 bool UsbMassStorageManager::beginSdCard() {
+#if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
+  blockCount_ = 0;
+  blockSize_ = kUsbBlockSize;
+  flashEraseSize_ = 4096;
+  cardReady_ = false;
+
+  if (flashPageBuffer_ == nullptr) {
+    flashPageBuffer_ = static_cast<uint8_t *>(
+        heap_caps_malloc(flashEraseSize_, MALLOC_CAP_INTERNAL));
+  }
+  if (flashPageBuffer_ == nullptr) {
+    Serial.println("[usb-msc] failed to allocate flash page buffer");
+    return false;
+  }
+
+  flashPartition_ = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_FAT,
+                                             "ffat");
+  if (flashPartition_ == nullptr) {
+    Serial.println("[usb-msc] flash partition 'ffat' not found");
+    return false;
+  }
+
+  if ((flashPartition_->size % blockSize_) != 0) {
+    Serial.printf("[usb-msc] flash partition size not aligned: %lu\n",
+                  static_cast<unsigned long>(flashPartition_->size));
+    return false;
+  }
+
+  blockCount_ = static_cast<uint32_t>(flashPartition_->size / blockSize_);
+  cardReady_ = true;
+  Serial.printf("[usb-msc] flash ready for USB (%lu MB)\n",
+                static_cast<unsigned long>(cardSizeBytes() / (1024ULL * 1024ULL)));
+  return true;
+#else
   blockCount_ = 0;
   blockSize_ = kUsbBlockSize;
   cardReady_ = false;
@@ -196,9 +235,19 @@ bool UsbMassStorageManager::beginSdCard() {
   }
 
   return false;
+#endif
 }
 
 void UsbMassStorageManager::endSdCard() {
+#if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
+  flashPartition_ = nullptr;
+  cardReady_ = false;
+  blockCount_ = 0;
+  if (flashPageBuffer_ != nullptr) {
+    heap_caps_free(flashPageBuffer_);
+    flashPageBuffer_ = nullptr;
+  }
+#else
   if (cardReady_) {
     deinitHostIfNeeded();
   }
@@ -209,6 +258,7 @@ void UsbMassStorageManager::endSdCard() {
     heap_caps_free(sectorBuffer_);
     sectorBuffer_ = nullptr;
   }
+#endif
 }
 
 int32_t UsbMassStorageManager::onRead(uint32_t lba, uint32_t offset, void *buffer,
@@ -236,11 +286,26 @@ bool UsbMassStorageManager::onStartStop(uint8_t powerCondition, bool start, bool
 
 int32_t UsbMassStorageManager::readSectors(uint32_t lba, uint32_t offset, void *buffer,
                                            uint32_t bufsize) {
-  if (!active_ || !cardReady_ || buffer == nullptr || sectorBuffer_ == nullptr ||
-      offset >= blockSize_) {
+  if (!active_ || !cardReady_ || buffer == nullptr || offset >= blockSize_) {
     return -1;
   }
 
+#if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
+  const uint64_t absoluteStart = (static_cast<uint64_t>(lba) * blockSize_) + offset;
+  const uint64_t absoluteEnd = absoluteStart + bufsize;
+  if (absoluteStart >= flashPartition_->size) {
+    return -1;
+  }
+  const uint64_t cappedEnd = std::min<uint64_t>(absoluteEnd, flashPartition_->size);
+  const size_t readSize = static_cast<size_t>(cappedEnd - absoluteStart);
+  const esp_err_t err = esp_partition_read(flashPartition_, absoluteStart, buffer, readSize);
+  if (err != ESP_OK) {
+    Serial.printf("[usb-msc] flash read failed offset=%llu err=0x%x\n",
+                  static_cast<unsigned long long>(absoluteStart), err);
+    return -1;
+  }
+  return static_cast<int32_t>(readSize);
+#else
   uint8_t *out = static_cast<uint8_t *>(buffer);
   uint32_t copied = 0;
   uint32_t currentLba = lba;
@@ -263,6 +328,7 @@ int32_t UsbMassStorageManager::readSectors(uint32_t lba, uint32_t offset, void *
   }
 
   return static_cast<int32_t>(copied);
+#endif
 }
 
 int32_t UsbMassStorageManager::writeSectors(uint32_t lba, uint32_t offset, uint8_t *buffer,
@@ -270,11 +336,55 @@ int32_t UsbMassStorageManager::writeSectors(uint32_t lba, uint32_t offset, uint8
   if (!writeEnabled_) {
     return -1;
   }
-  if (!active_ || !cardReady_ || buffer == nullptr || sectorBuffer_ == nullptr ||
-      offset >= blockSize_) {
+  if (!active_ || !cardReady_ || buffer == nullptr || offset >= blockSize_) {
     return -1;
   }
 
+#if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
+  if (flashPartition_ == nullptr || flashPageBuffer_ == nullptr) {
+    return -1;
+  }
+
+  uint32_t written = 0;
+  while (written < bufsize) {
+    const uint64_t absolute = (static_cast<uint64_t>(lba) * blockSize_) + offset + written;
+    if (absolute >= flashPartition_->size) {
+      return written > 0 ? static_cast<int32_t>(written) : -1;
+    }
+
+    const uint64_t pageStart = (absolute / flashEraseSize_) * flashEraseSize_;
+    const uint32_t pageOffset = static_cast<uint32_t>(absolute - pageStart);
+    const uint32_t bytesThisPage =
+        std::min<uint32_t>(flashEraseSize_ - pageOffset, bufsize - written);
+
+    esp_err_t err = esp_partition_read(flashPartition_, pageStart, flashPageBuffer_, flashEraseSize_);
+    if (err != ESP_OK) {
+      Serial.printf("[usb-msc] flash pre-read failed offset=%llu err=0x%x\n",
+                    static_cast<unsigned long long>(pageStart), err);
+      return written > 0 ? static_cast<int32_t>(written) : -1;
+    }
+
+    std::memcpy(flashPageBuffer_ + pageOffset, buffer + written, bytesThisPage);
+
+    err = esp_partition_erase_range(flashPartition_, pageStart, flashEraseSize_);
+    if (err != ESP_OK) {
+      Serial.printf("[usb-msc] flash erase failed offset=%llu err=0x%x\n",
+                    static_cast<unsigned long long>(pageStart), err);
+      return written > 0 ? static_cast<int32_t>(written) : -1;
+    }
+
+    err = esp_partition_write(flashPartition_, pageStart, flashPageBuffer_, flashEraseSize_);
+    if (err != ESP_OK) {
+      Serial.printf("[usb-msc] flash write failed offset=%llu err=0x%x\n",
+                    static_cast<unsigned long long>(pageStart), err);
+      return written > 0 ? static_cast<int32_t>(written) : -1;
+    }
+
+    written += bytesThisPage;
+  }
+
+  return static_cast<int32_t>(written);
+#else
   uint32_t written = 0;
   uint32_t currentLba = lba;
   uint32_t currentOffset = offset;
@@ -306,6 +416,7 @@ int32_t UsbMassStorageManager::writeSectors(uint32_t lba, uint32_t offset, uint8
   }
 
   return static_cast<int32_t>(written);
+#endif
 }
 
 bool UsbMassStorageManager::handleStartStop(uint8_t powerCondition, bool start, bool loadEject) {
