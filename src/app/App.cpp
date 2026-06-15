@@ -2612,7 +2612,7 @@ bool App::handleTopEdgeMenuSwipe(const TouchEvent &event, uint32_t nowMs, int de
 bool App::handleBottomEdgeQuickSettingsSwipe(const TouchEvent &event, uint32_t nowMs, int deltaX,
                                              int deltaY, bool ended) {
   if (!Board::Config::ENABLE_BOTTOM_EDGE_QUICK_SETTINGS_SWIPE || !ended ||
-      state_ == AppState::Menu || state_ == AppState::Standby || state_ == AppState::Sleeping) {
+      state_ == AppState::Standby || state_ == AppState::Sleeping) {
     return false;
   }
 
@@ -2628,8 +2628,16 @@ bool App::handleBottomEdgeQuickSettingsSwipe(const TouchEvent &event, uint32_t n
 
   pausedTouch_.active = false;
   pausedTouchIntent_ = TouchIntent::None;
-  openMainMenu(nowMs);
-  Serial.printf("[touch] bottom-edge menu swipe x=%u y=%u dy=%d\n", event.x, event.y, deltaY);
+
+  if (state_ == AppState::Menu || state_ == AppState::CompanionSync || 
+      state_ == AppState::UsbTransfer) {
+    setState(AppState::Paused, nowMs);
+    Serial.printf("[touch] bottom-edge back swipe x=%u y=%u dy=%d (returning to reader)\n", 
+                  event.x, event.y, deltaY);
+  } else {
+    openMainMenu(nowMs);
+    Serial.printf("[touch] bottom-edge menu swipe x=%u y=%u dy=%d\n", event.x, event.y, deltaY);
+  }
   return true;
 }
 
