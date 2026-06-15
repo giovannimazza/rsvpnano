@@ -1,92 +1,18 @@
 #include "storage/SeedBooks.h"
 
 #include <SD_MMC.h>
+
 #include <cerrno>
 #include <cstring>
+#include <vector>
 
-#include "board/BoardConfig.h"
+#include "storage/SeedBooks.generated.h"
 #include "storage/fs/StorageFiles.h"
 #include "storage/fs/StoragePaths.h"
 
 namespace {
 
 constexpr const char *kSeedMarkerPath = "/config/.seed-books-v1";
-
-constexpr const char kEuropeanLetterDemoBook[] = R"(@rsvp 1
-@title European Letter Demo
-@author Codex
-@source docs/demo-books/european-letter-demo.rsvp
-@chapter What This Shows
-@para
-This demo book exercises the accented, Baltic, Sami, and extended-Latin letters that the current firmware should now preserve, pace, and render correctly.
-@para
-If the update worked, these chapters should show real letters instead of question marks.
-
-@chapter Quotes And Brackets
-@para
-“Quoted text,” ‘single quotes,’ «guillemets,» and ‹angle quotes› should stay visible.
-@para
-(Parentheses) [brackets] {braces} <angles> should stay wrapped around words.
-@para
-Fullwidth forms like （these）, ［these］, ｛these｝, and ＜these＞ should collapse into readable ASCII wrappers.
-
-@chapter Germanic And Nordic
-@para
-Ärger größer Übermut Straße Fußgänger Mädchen schön kühl.
-@para
-Æsir Øresund Ålesund blåbær smørrebrød Þingvellir þjóðvegur veður.
-@para
-Õun öö ääni jääkülm.
-
-@chapter French And Western European
-@para
-Œuvre cœur sœur garçon français Noël déjà façade maïs.
-@para
-¿Qué tal? ¡Aquí está! Señor, año, niño, canción, corazón, pingüino, vergüenza, acción y café should keep Spanish punctuation and accents readable.
-@para
-Português também deve funcionar: ação, coração, amanhã, informação, maçã, São Paulo, bênção e português.
-
-@chapter Polish Romanian And Turkish
-@para
-Łódź książę Śląsk Żubr Źródło Ćma dźwięk pięć.
-@para
-Țară Știință înțelegere ăsta română înger.
-@para
-İzmir ışık çağdaş öğüt şeker üzüm.
-
-@chapter Baltic
-@para
-Ābele Čiekurs Ēna Ģimene Īlens Ķirbis Ļaudis Ņem Šūpoles Ūdens Žagata.
-@para
-Ąžuolas Ėriukas Įžanga Šaltis Ųkis Ūkas Žingsnis.
-@para
-Pair bank Ą ą Ę ę Ė ė Į į Š š Ų ų Ū ū Ž ž.
-
-@chapter Sami
-@para
-Áigi Čáhci Đálki Ŋuovža Šávza Ŧuorri Žárga.
-@para
-Pair bank Á á Č č Đ đ Ŋ ŋ Š š Ŧ ŧ Ž ž.
-
-@chapter Full Pair Bank
-@para
-Æ æ Œ œ Ø ø Å å Ä ä Ö ö Ü ü Þ þ Ð ð Ł ł Č č Š š Ž ž Ă ă Ș ș Ț ț Ğ ğ Ş ş İ ı Ą ą Ę ę Ć ć Ń ń Ś ś Ź ź Ż ż Ā ā Ē ē Ģ ģ Ī ī Ķ ķ Ļ ļ Ņ ņ Ė ė Į į Ų ų Ū ū Đ đ Ŋ ŋ Ŧ ŧ.
-)";
-
-constexpr const char kGettingStartedBook[] = R"(@rsvp 1
-@title Getting Started
-@author RSVP Nano
-@source built-in seed
-@chapter Open This Book
-@para
-This book is bundled into flash so it appears in Books right after you flash the firmware.
-@para
-Add more seed files here to preload your own library.
-
-@chapter Next Step
-@para
-You can replace this demo with your own .rsvp or .txt content later without changing the firmware UI.
-)";
 
 bool writeTextFile(const char *path, const char *contents) {
   errno = 0;
@@ -108,12 +34,92 @@ bool writeTextFile(const char *path, const char *contents) {
   return true;
 }
 
+bool readMarker(String *markerContents) {
+  File file = SD_MMC.open(kSeedMarkerPath, FILE_READ);
+  if (!file) {
+    return false;
+  }
+
+  *markerContents = file.readString();
+  file.close();
+  return true;
+}
+
+std::vector<String> parseMarkedPaths(const String &markerContents) {
+  std::vector<String> paths;
+  int start = 0;
+  bool firstLine = true;
+
+  while (start <= markerContents.length()) {
+    int end = markerContents.indexOf('\n', start);
+    if (end < 0) {
+      end = static_cast<int>(markerContents.length());
+    }
+
+    String line = markerContents.substring(start, end);
+    line.trim();
+    if (!firstLine && !line.isEmpty()) {
+      paths.push_back(line);
+    }
+
+    if (end >= static_cast<int>(markerContents.length())) {
+      break;
+    }
+
+    firstLine = false;
+    start = end + 1;
+  }
+
+  return paths;
+}
+
+bool removePathIfExists(const String &path) {
+  if (!StorageFiles::fileExists(path)) {
+    return true;
+  }
+  if (!SD_MMC.remove(path)) {
+    Serial.printf("[seed-books] remove failed: %s\n", path.c_str());
+    return false;
+  }
+  return true;
+}
+
+bool removePreviousSeededFiles(const String &markerContents) {
+  for (const String &path : parseMarkedPaths(markerContents)) {
+    if (!removePathIfExists(path)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool writeMarker() {
+  File file = SD_MMC.open(kSeedMarkerPath, FILE_WRITE);
+  if (!file) {
+    Serial.printf("[seed-books] open marker failed: %s\n", kSeedMarkerPath);
+    return false;
+  }
+
+  file.println(kSeedManifestHash);
+  for (size_t i = 0; i < kSeedBookCount; ++i) {
+    file.println(kSeededBooks[i].path);
+  }
+  file.close();
+  return true;
+}
+
 }  // namespace
 
 bool seedDemoBooksIfNeeded() {
 #if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
-  if (StorageFiles::fileExists(kSeedMarkerPath)) {
-    return false;
+  String markerContents;
+  const bool hasMarker = readMarker(&markerContents);
+  if (hasMarker) {
+    const int newlineIndex = markerContents.indexOf('\n');
+    const String markerHash = newlineIndex >= 0 ? markerContents.substring(0, newlineIndex) : markerContents;
+    if (markerHash == kSeedManifestHash) {
+      return false;
+    }
   }
 
   if (!StorageFiles::ensureDirectory(StoragePaths::kBooksPath, "seed-books") ||
@@ -123,17 +129,22 @@ bool seedDemoBooksIfNeeded() {
     return false;
   }
 
-  const bool demoOk = writeTextFile("/books/books/european-letter-demo.rsvp", kEuropeanLetterDemoBook);
-  const bool starterOk = writeTextFile("/books/books/getting-started.rsvp", kGettingStartedBook);
-  if (!demoOk || !starterOk) {
+  if (hasMarker && !removePreviousSeededFiles(markerContents)) {
     return false;
   }
 
-  if (!writeTextFile(kSeedMarkerPath, "seed-books-v1\n")) {
+  for (size_t i = 0; i < kSeedBookCount; ++i) {
+    if (!writeTextFile(kSeededBooks[i].path, kSeededBooks[i].contents)) {
+      return false;
+    }
+  }
+
+  if (!writeMarker()) {
     return false;
   }
 
-  Serial.println("[seed-books] built-in books imported");
+  Serial.printf("[seed-books] imported %u built-in books\n",
+                static_cast<unsigned int>(kSeedBookCount));
   return true;
 #else
   return false;
