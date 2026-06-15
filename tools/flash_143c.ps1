@@ -2,8 +2,14 @@
 # Flash books (LittleFS) and firmware to the Waveshare AMOLED 1.43C
 # Usage: .\tools\flash_143c.ps1
 
-$env_name = "waveshare_esp32s3_touch_amoled_143c"
-$stale = "src\storage\SeedBooks.generated.h"
+$env_name   = "waveshare_esp32s3_touch_amoled_143c"
+$stale      = "src\storage\SeedBooks.generated.h"
+$data_dir   = "data"
+
+# LittleFS partition size from partitions_143c.csv (0x260000 bytes)
+# Reserve ~10% for LittleFS metadata/journal overhead
+$partition_bytes = 0x260000
+$usable_bytes    = [int]($partition_bytes * 0.90)
 
 # Remove stale generated file if left over from old builds
 if (Test-Path $stale) {
@@ -11,6 +17,33 @@ if (Test-Path $stale) {
     Remove-Item $stale -Force
 }
 
+# --- Space check ---
+Write-Host "==> Checking available space..." -ForegroundColor Cyan
+$files = Get-ChildItem -Path $data_dir -Recurse -File -ErrorAction SilentlyContinue
+$total_bytes = ($files | Measure-Object -Property Length -Sum).Sum
+if (-not $total_bytes) { $total_bytes = 0 }
+
+$total_kb    = [math]::Round($total_bytes / 1KB, 1)
+$usable_kb   = [math]::Round($usable_bytes / 1KB, 1)
+$partition_kb = [math]::Round($partition_bytes / 1KB, 1)
+$pct         = if ($usable_bytes -gt 0) { [math]::Round($total_bytes / $usable_bytes * 100, 1) } else { 0 }
+
+Write-Host "   Partition : $partition_kb KB  (usable ~$usable_kb KB after LittleFS overhead)"
+Write-Host "   Data size : $total_kb KB  ($pct% of usable space)"
+
+if ($total_bytes -gt $usable_bytes) {
+    Write-Host ""
+    Write-Host "ERROR: Data ($total_kb KB) exceeds usable LittleFS space ($usable_kb KB)." -ForegroundColor Red
+    Write-Host "       Remove or split some books in $data_dir\books\books\" -ForegroundColor Red
+    exit 1
+} elseif ($pct -gt 80) {
+    Write-Host "   WARNING: space is above 80% — consider removing some books." -ForegroundColor Yellow
+} else {
+    Write-Host "   Space OK." -ForegroundColor Green
+}
+
+# --- Flash filesystem ---
+Write-Host ""
 Write-Host "==> Flashing filesystem (books)..." -ForegroundColor Cyan
 pio run -e $env_name -t uploadfs
 if ($LASTEXITCODE -ne 0) {
@@ -18,6 +51,7 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
+# --- Flash firmware ---
 Write-Host ""
 Write-Host "==> Flashing firmware..." -ForegroundColor Cyan
 pio run -e $env_name -t upload
