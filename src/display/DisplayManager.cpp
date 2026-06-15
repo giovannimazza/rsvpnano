@@ -3020,11 +3020,12 @@ void DisplayManager::renderTextEntry(const String &title, const String &prompt, 
   const int virtualWidth = kDisplayWidth;
   const int virtualHeight = kDisplayHeight;
   const String headerText = title.isEmpty() ? helperText : title;
-  const int headerY = 4;
+  const bool roundDisplay = virtualWidth == virtualHeight;
+  const int headerY = roundDisplay ? 84 : 4;
   const int fieldX = 10;
-  const int fieldY = headerText.isEmpty() ? 8 : 14;
+  const int fieldY = roundDisplay ? 118 : (headerText.isEmpty() ? 8 : 14);
   const int fieldWidth = virtualWidth - 20;
-  const int fieldHeight = 28;
+  const int fieldHeight = roundDisplay ? 32 : 28;
   constexpr uint8_t kFieldTextScalePercent = 36;
   const int fieldTextHeight = scaledPercentDimension(
       baseGlyphHeightForTypeface(effectiveReaderTypefaceForText(value.isEmpty() ? prompt : value)),
