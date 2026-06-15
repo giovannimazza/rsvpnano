@@ -55,6 +55,9 @@ constexpr uint16_t kMenuSwipeTopZonePx =
 constexpr uint16_t kQuickSettingsSwipeBottomZonePx =
     kReaderChromeBottomMarginPx + (Board::Config::ENABLE_BOTTOM_EDGE_QUICK_SETTINGS_SWIPE ? 64 : 0);
 constexpr uint16_t kMenuSwipeTriggerPx = 72;
+constexpr bool kRoundDisplay = Board::Config::DISPLAY_WIDTH == Board::Config::DISPLAY_HEIGHT;
+constexpr uint16_t kRoundSwipeZoneExtraPx = 28;
+constexpr uint16_t kRoundSwipeFaceInsetPx = 10;
 constexpr uint16_t kScrubStepPx = 22;
 constexpr uint16_t kBrowseNeutralZonePx = 14;
 constexpr uint16_t kFocusTimerCancelHoldMaxDriftPx = 20;
@@ -96,6 +99,40 @@ constexpr uint8_t kNightBrightnessLevels[] = {35, 40, 45, 50, 55};
 constexpr size_t kBrightnessLevelCount = sizeof(kBrightnessLevels) / sizeof(kBrightnessLevels[0]);
 
 namespace {
+
+bool touchPointInsideUsableFace(uint16_t x, uint16_t y, uint16_t insetPx = 0) {
+  if (!kRoundDisplay) {
+    return true;
+  }
+
+  const int centerX = Board::Config::DISPLAY_WIDTH / 2;
+  const int centerY = Board::Config::DISPLAY_HEIGHT / 2;
+  const int baseRadius = std::min(Board::Config::DISPLAY_WIDTH, Board::Config::DISPLAY_HEIGHT) / 2;
+  const int radius = std::max(1, baseRadius - static_cast<int>(insetPx));
+  const int dx = static_cast<int>(x) - centerX;
+  const int dy = static_cast<int>(y) - centerY;
+  return (dx * dx) + (dy * dy) <= (radius * radius);
+}
+
+bool isTopEdgeSwipeStart(uint16_t startX, uint16_t startY) {
+  if (!touchPointInsideUsableFace(startX, startY, kRoundSwipeFaceInsetPx)) {
+    return false;
+  }
+
+  const uint16_t topZone = static_cast<uint16_t>(
+      kMenuSwipeTopZonePx + (kRoundDisplay ? kRoundSwipeZoneExtraPx : 0));
+  return startY <= topZone;
+}
+
+bool isBottomEdgeSwipeStart(uint16_t startX, uint16_t startY) {
+  if (!touchPointInsideUsableFace(startX, startY, kRoundSwipeFaceInsetPx)) {
+    return false;
+  }
+
+  const uint16_t bottomZone = static_cast<uint16_t>(
+      kQuickSettingsSwipeBottomZonePx + (kRoundDisplay ? kRoundSwipeZoneExtraPx : 0));
+  return startY >= static_cast<uint16_t>(Board::Config::DISPLAY_HEIGHT - bottomZone);
+}
 
 enum MenuItem : size_t {
   MenuResume,
@@ -2557,7 +2594,7 @@ bool App::handleTopEdgeMenuSwipe(const TouchEvent &event, uint32_t nowMs, int de
 
   const int absDeltaX = abs(deltaX);
   const int absDeltaY = abs(deltaY);
-  const bool startsNearTop = pausedTouch_.startY <= kMenuSwipeTopZonePx;
+  const bool startsNearTop = isTopEdgeSwipeStart(pausedTouch_.startX, pausedTouch_.startY);
   const bool verticalDownSwipe =
       deltaY >= static_cast<int>(kMenuSwipeTriggerPx) &&
       absDeltaY > absDeltaX + static_cast<int>(kAxisBiasPx);
@@ -2581,9 +2618,7 @@ bool App::handleBottomEdgeQuickSettingsSwipe(const TouchEvent &event, uint32_t n
 
   const int absDeltaX = abs(deltaX);
   const int absDeltaY = abs(deltaY);
-  const bool startsNearBottom =
-      pausedTouch_.startY >=
-      static_cast<uint16_t>(Board::Config::DISPLAY_HEIGHT - kQuickSettingsSwipeBottomZonePx);
+  const bool startsNearBottom = isBottomEdgeSwipeStart(pausedTouch_.startX, pausedTouch_.startY);
   const bool verticalUpSwipe =
       deltaY <= -static_cast<int>(kMenuSwipeTriggerPx) &&
       absDeltaY > absDeltaX + static_cast<int>(kAxisBiasPx);

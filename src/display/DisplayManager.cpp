@@ -2863,6 +2863,9 @@ void DisplayManager::renderMenu(const std::vector<String> &items, size_t selecte
   const int rowHeight = kCompactMenuRowHeight;
   const int totalHeight = rowHeight * static_cast<int>(visibleCount);
   int y = std::max(0, (virtualHeight - totalHeight) / 2);
+  const bool roundDisplay = virtualWidth == virtualHeight;
+  const int menuHorizontalInset = roundDisplay ? 44 : kCompactMenuX;
+  const int maxWidth = std::max(1, virtualWidth - (2 * menuHorizontalInset));
 
   clearVirtualBuffer(virtualWidth, virtualHeight);
 
@@ -2870,12 +2873,14 @@ void DisplayManager::renderMenu(const std::vector<String> &items, size_t selecte
     const size_t itemIndex = firstVisible + row;
     const bool selected = itemIndex == selectedIndex;
     const uint16_t color = selected ? focusColor() : dimColor();
-    const int maxWidth = virtualWidth - kCompactMenuX - 16;
+    const String itemText = fitTinyText(items[itemIndex], maxWidth, kTinyScale);
+    const int textWidth = measureTinyTextWidth(itemText, kTinyScale);
+    const int textX = std::max(menuHorizontalInset, (virtualWidth - textWidth) / 2);
     if (selected) {
-      fillVirtualRect(10, y + 2, 5, kTinyGlyphHeight * kTinyScale + 2, selectedBarColor());
+      fillVirtualRect(std::max(10, textX - 12), y + 2, 5, kTinyGlyphHeight * kTinyScale + 2,
+                      selectedBarColor());
     }
-    drawTinyTextAt(fitTinyText(items[itemIndex], maxWidth, kTinyScale), kCompactMenuX, y + 3, color,
-                   kTinyScale);
+    drawTinyTextAt(itemText, textX, y + 3, color, kTinyScale);
     y += rowHeight;
   }
 
