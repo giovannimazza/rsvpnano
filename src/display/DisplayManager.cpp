@@ -1655,9 +1655,8 @@ void DisplayManager::drawBatteryBadge(int logicalWidth, int logicalHeight) {
   }
 
   const int width = measureTinyTextWidth(batteryLabel_, kTinyScale);
-  const int x = std::max(kReaderBatteryMarginX, logicalWidth - kReaderBatteryMarginX - width);
-  const int y = logicalHeight > (kDisplayHeight * 2) ? kReaderBatteryMarginTop + 8
-                                                      : kReaderBatteryMarginTop;
+  const int x = (logicalWidth - width) / 2;
+  const int y = kReaderBatteryMarginTop;
   drawTinyTextAt(batteryLabel_, x, y, footerColor(), kTinyScale);
 }
 

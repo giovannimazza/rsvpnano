@@ -228,6 +228,7 @@ enum QuickSettingsItem : size_t {
   QuickSettingsTheme,
   QuickSettingsFocusTimer,
   QuickSettingsSync,
+  QuickSettingsBack,
   QuickSettingsItemCount,
 };
 
@@ -3369,6 +3370,9 @@ void App::selectQuickSettingsItem(uint32_t nowMs) {
     case QuickSettingsSync:
       openQuickSync();
       return;
+    case QuickSettingsBack:
+      setState(AppState::Paused, nowMs);
+      return;
     default:
       return;
   }
@@ -6429,6 +6433,7 @@ void App::renderQuickSettings() {
   items.push_back(String("Theme: ") + themeModeLabel());
   items.push_back("Focus Timer");
   items.push_back("Sync");
+  items.push_back("Back");
   display_.renderMenu(items, quickSettingsSelectedIndex_);
 }
 
