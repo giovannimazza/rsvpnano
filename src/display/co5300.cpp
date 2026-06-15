@@ -7,7 +7,7 @@
 
 namespace {
 
-constexpr int kSpiFrequency = 40000000;
+constexpr int kSpiFrequency = 20000000;
 constexpr int kSendBufferPixels = 0x4000;
 static const char *kCo5300Tag = "co5300";
 
@@ -19,13 +19,18 @@ struct LcdCommand {
 };
 
 constexpr LcdCommand kQspiInit[] = {
+    {0xFE, {0x20}, 1, 0},
+    {0xF4, {0x5A}, 1, 0},
+    {0xF5, {0x59}, 1, 0},
+    {0xFE, {0x80}, 1, 0},
+    {0x03, {0x00}, 1, 0},
     {0xFE, {0x00}, 1, 0},
     {0xC4, {0x80}, 1, 0},
     {0x3A, {0x55}, 1, 0},
     {0x35, {0x00}, 1, 0},
     {0x53, {0x20}, 1, 0},
     {0x51, {0xFF}, 1, 0},
-    {0x63, {0xFF}, 1, 0},
+    {0x63, {0xAB}, 1, 0},
     {0x2A, {0x00, 0x06, 0x01, 0xD7}, 4, 0},
     {0x2B, {0x00, 0x00, 0x01, 0xD1}, 4, 0},
     {0x11, {0x00}, 0, 100},
@@ -102,7 +107,7 @@ void co5300Init() {
     spi_device_interface_config_t deviceConfig = {};
     deviceConfig.command_bits = 8;
     deviceConfig.address_bits = 24;
-    deviceConfig.mode = SPI_MODE3;
+    deviceConfig.mode = SPI_MODE0;
     deviceConfig.clock_speed_hz = kSpiFrequency;
     deviceConfig.spics_io_num = BoardConfig::PIN_LCD_CS;
     deviceConfig.flags = SPI_DEVICE_HALFDUPLEX;
@@ -120,11 +125,18 @@ void co5300Init() {
     }
   }
 
-  gPanelOn = false;
+  gPanelOn = true;
   ESP_LOGI(kCo5300Tag, "CO5300 QSPI init complete");
 }
 
 void co5300SetBacklight(bool on) {
+  if (gPanelOn == on) {
+    if (on) {
+      setBrightness(gBrightnessPercent);
+    }
+    return;
+  }
+
   gPanelOn = on;
   if (!gPanelOn) {
     sendCommand(0x28, nullptr, 0);

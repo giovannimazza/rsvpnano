@@ -18,13 +18,14 @@ constexpr int PIN_BOOT_BUTTON = 0;
 constexpr int PIN_PWR_BUTTON = 16;
 constexpr int PIN_BATTERY_ADC = 4;
 
-constexpr int PIN_LCD_CS = 14;
-constexpr int PIN_LCD_SCLK = 13;
+constexpr int PIN_LCD_TE = 7;
 constexpr int PIN_LCD_DATA0 = 8;
 constexpr int PIN_LCD_DATA1 = 9;
 constexpr int PIN_LCD_DATA2 = 10;
 constexpr int PIN_LCD_DATA3 = 11;
 constexpr int PIN_LCD_RST = 12;
+constexpr int PIN_LCD_SCLK = 13;
+constexpr int PIN_LCD_CS = 14;
 constexpr int PIN_LCD_BACKLIGHT = -1;
 
 constexpr int PANEL_NATIVE_WIDTH = 466;
