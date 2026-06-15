@@ -3,12 +3,18 @@
 
 #include <algorithm>
 
+#include "drivers/touch/cst92xx/cst92xx.h"
+
 namespace {
 
 uint8_t gTouchAddress = Board::Config::TOUCH_I2C_ADDRESS;
-constexpr uint8_t kProbeAddresses[] = {0x15, 0x14, 0x38};
+enum class TouchProtocol : uint8_t { Unknown = 0, Legacy, Cst92xx };
+TouchProtocol gProtocol = TouchProtocol::Unknown;
+constexpr uint8_t kProbeAddresses[] = {0x15, 0x14, 0x38, 0x5A};
 constexpr uint8_t kCountRegister = 2;
 constexpr uint8_t kPointRegister = 3;
+constexpr size_t kLegacyPacketLength = 7;
+const size_t kCstPacketLength = Cst92xxTouch::packetLength();
 
 bool probeTouchAddress(TwoWire &touchWire, uint8_t address) {
   touchWire.beginTransmission(address);
@@ -34,6 +40,7 @@ void resetController() { Board::System::resetTouchController(); }
 bool ready() { return Board::Config::PIN_TOUCH_IRQ < 0 || !digitalRead(Board::Config::PIN_TOUCH_IRQ); }
 
 bool configure() {
+  gProtocol = TouchProtocol::Unknown;
   TwoWire &touchWire = wire();
   for (uint8_t address : kProbeAddresses) {
     if (!probeTouchAddress(touchWire, address)) {
@@ -46,10 +53,10 @@ bool configure() {
   return false;
 }
 
-size_t packetLength() { return 7; }
+size_t packetLength() { return kCstPacketLength; }
 
-bool readPacket(uint8_t *buffer, size_t len) {
-  if (buffer == nullptr || len < packetLength()) {
+bool readLegacyPacket(uint8_t *buffer, size_t len) {
+  if (buffer == nullptr || len < kLegacyPacketLength) {
     return false;
   }
 
@@ -67,7 +74,7 @@ bool readPacket(uint8_t *buffer, size_t len) {
   const uint8_t count = touchWire.read();
   buffer[0] = count;
   if (count == 0) {
-    for (size_t i = 1; i < packetLength(); ++i) {
+    for (size_t i = 1; i < kLegacyPacketLength; ++i) {
       buffer[i] = 0;
     }
     return true;
@@ -94,9 +101,35 @@ bool readPacket(uint8_t *buffer, size_t len) {
   return true;
 }
 
-bool decodePacket(const uint8_t *data, size_t len, BoardDrivers::Touch::Sample &sample) {
-  if (data == nullptr || len < packetLength()) {
+bool readPacket(uint8_t *buffer, size_t len) {
+  if (buffer == nullptr || len < packetLength()) {
     return false;
+  }
+
+  if (gProtocol != TouchProtocol::Legacy &&
+      Cst92xxTouch::readPacket(wire(), gTouchAddress, buffer, kCstPacketLength)) {
+    gProtocol = TouchProtocol::Cst92xx;
+    return true;
+  }
+
+  if (readLegacyPacket(buffer, len)) {
+    for (size_t i = kLegacyPacketLength; i < len; ++i) {
+      buffer[i] = 0;
+    }
+    gProtocol = TouchProtocol::Legacy;
+    return true;
+  }
+
+  return false;
+}
+
+bool decodePacket(const uint8_t *data, size_t len, BoardDrivers::Touch::Sample &sample) {
+  if (data == nullptr || len < kLegacyPacketLength) {
+    return false;
+  }
+
+  if (gProtocol == TouchProtocol::Cst92xx) {
+    return Cst92xxTouch::decodePacket(data, len, sample);
   }
 
   const uint8_t count = data[0];
