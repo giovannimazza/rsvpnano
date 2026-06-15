@@ -18,14 +18,14 @@ constexpr int PIN_BOOT_BUTTON = 0;
 constexpr int PIN_PWR_BUTTON = -1;
 constexpr int PIN_BATTERY_ADC = 4;
 
-constexpr int PIN_LCD_TE = 7;
-constexpr int PIN_LCD_DATA0 = 8;
-constexpr int PIN_LCD_DATA1 = 9;
-constexpr int PIN_LCD_DATA2 = 10;
-constexpr int PIN_LCD_DATA3 = 11;
-constexpr int PIN_LCD_RST = 12;
-constexpr int PIN_LCD_SCLK = 13;
-constexpr int PIN_LCD_CS = 14;
+constexpr int PIN_LCD_TE = 8;
+constexpr int PIN_LCD_DATA0 = 9;
+constexpr int PIN_LCD_DATA1 = 10;
+constexpr int PIN_LCD_DATA2 = 11;
+constexpr int PIN_LCD_DATA3 = 12;
+constexpr int PIN_LCD_RST = 13;
+constexpr int PIN_LCD_SCLK = 14;
+constexpr int PIN_LCD_CS = 15;
 constexpr int PIN_LCD_BACKLIGHT = -1;
 
 constexpr int PANEL_NATIVE_WIDTH = 466;
@@ -42,7 +42,7 @@ constexpr int PIN_I2C_SDA = 47;
 constexpr int PIN_I2C_SCL = 48;
 constexpr int PIN_TOUCH_SDA = 47;
 constexpr int PIN_TOUCH_SCL = 48;
-constexpr int PIN_TOUCH_RST = 15;
+constexpr int PIN_TOUCH_RST = 16;
 constexpr int PIN_TOUCH_INT = 17;
 constexpr bool HAS_TCA9554 = false;
 #else
