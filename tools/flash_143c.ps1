@@ -17,7 +17,24 @@ if (Test-Path $stale) {
     Remove-Item $stale -Force
 }
 
+# --- Rename files with spaces (LittleFS does not support spaces in filenames) ---
+Write-Host "==> Checking for spaces in filenames..." -ForegroundColor Cyan
+$spaceFiles = Get-ChildItem -Path $data_dir -Recurse -File |
+              Where-Object { $_.Name -match ' ' }
+if ($spaceFiles) {
+    foreach ($f in $spaceFiles) {
+        $newName = $f.Name -replace ' ', '_'
+        $newPath = Join-Path $f.DirectoryName $newName
+        Write-Host "   Renaming: $($f.Name) -> $newName" -ForegroundColor Yellow
+        Rename-Item -Path $f.FullName -NewName $newName -Force
+    }
+    Write-Host "   Done renaming." -ForegroundColor Green
+} else {
+    Write-Host "   No spaces found." -ForegroundColor Green
+}
+
 # --- Space check ---
+Write-Host ""
 Write-Host "==> Checking available space..." -ForegroundColor Cyan
 $files = Get-ChildItem -Path $data_dir -Recurse -File -ErrorAction SilentlyContinue
 $total_bytes = ($files | Measure-Object -Property Length -Sum).Sum
