@@ -8,9 +8,10 @@
 namespace {
 
 #if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
-constexpr uint8_t kAddress = 0x15;
+constexpr uint8_t kProbeAddresses[] = {0x15, 0x14, 0x38};
+uint8_t gAddress = kProbeAddresses[0];
 #else
-constexpr uint8_t kAddress = 0x3B;
+constexpr uint8_t gAddress = 0x3B;
 constexpr uint8_t kReadTouchCommand[] = {
     0xB5, 0xAB, 0xA5, 0x5A, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00,
 };
@@ -57,14 +58,28 @@ bool TouchHandler::begin() {
     delay(50);
   }
 #endif
-  Wire.beginTransmission(kAddress);
+#if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
+  initialized_ = false;
+  for (uint8_t i = 0; i < (sizeof(kProbeAddresses) / sizeof(kProbeAddresses[0])); ++i) {
+    const uint8_t candidate = kProbeAddresses[i];
+    Wire.beginTransmission(candidate);
+    const uint8_t error = Wire.endTransmission();
+    if (error == 0) {
+      gAddress = candidate;
+      initialized_ = true;
+      break;
+    }
+  }
+#else
+  Wire.beginTransmission(gAddress);
   const uint8_t error = Wire.endTransmission();
   initialized_ = (error == 0);
+#endif
 
   if (!initialized_) {
-    Serial.printf("[touch] Controller not detected at 0x%02X\n", kAddress);
+    Serial.println("[touch] Controller not detected on probed addresses");
   } else {
-    Serial.printf("[touch] Initialized (0x%02X)\n", kAddress);
+    Serial.printf("[touch] Initialized (0x%02X)\n", gAddress);
   }
 
   return initialized_;
@@ -105,14 +120,14 @@ bool TouchHandler::readTouchPacket(uint8_t *buffer, size_t len) {
   (void)len;
   return false;
 #else
-  Wire.beginTransmission(kAddress);
+  Wire.beginTransmission(gAddress);
   Wire.write(kReadTouchCommand, sizeof(kReadTouchCommand));
   if (Wire.endTransmission(false) != 0) {
     return false;
   }
 
   const size_t readLen =
-      Wire.requestFrom(static_cast<uint8_t>(kAddress), static_cast<size_t>(len), true);
+      Wire.requestFrom(static_cast<uint8_t>(gAddress), static_cast<size_t>(len), true);
   if (readLen != len) {
     return false;
   }
@@ -142,14 +157,14 @@ bool TouchHandler::poll(TouchEvent &event) {
   }
   lastPollMs_ = now;
 
-  Wire.beginTransmission(kAddress);
+  Wire.beginTransmission(gAddress);
   Wire.write(static_cast<uint8_t>(2));
   if (Wire.endTransmission(false) != 0) {
     backoffUntilMs_ = now + kFailureBackoffMs;
     return false;
   }
 
-  if (Wire.requestFrom(static_cast<uint8_t>(kAddress), static_cast<size_t>(1), true) != 1) {
+  if (Wire.requestFrom(static_cast<uint8_t>(gAddress), static_cast<size_t>(1), true) != 1) {
     backoffUntilMs_ = now + kFailureBackoffMs;
     return false;
   }
@@ -173,7 +188,7 @@ bool TouchHandler::poll(TouchEvent &event) {
     return false;
   }
 
-  Wire.beginTransmission(kAddress);
+  Wire.beginTransmission(gAddress);
   Wire.write(static_cast<uint8_t>(3));
   if (Wire.endTransmission(false) != 0) {
     backoffUntilMs_ = now + kFailureBackoffMs;
@@ -181,7 +196,7 @@ bool TouchHandler::poll(TouchEvent &event) {
   }
 
   const size_t readLen = static_cast<size_t>(count) * 6;
-  if (Wire.requestFrom(static_cast<uint8_t>(kAddress), readLen, true) != readLen) {
+  if (Wire.requestFrom(static_cast<uint8_t>(gAddress), readLen, true) != readLen) {
     backoffUntilMs_ = now + kFailureBackoffMs;
     return false;
   }
