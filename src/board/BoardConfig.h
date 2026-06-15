@@ -44,6 +44,7 @@ constexpr int PIN_TOUCH_SDA = 47;
 constexpr int PIN_TOUCH_SCL = 48;
 constexpr int PIN_TOUCH_RST = 15;
 constexpr int PIN_TOUCH_INT = 17;
+constexpr bool HAS_TCA9554 = false;
 #else
 constexpr int PIN_BOOT_BUTTON = 0;
 constexpr int PIN_PWR_BUTTON = 16;
@@ -74,6 +75,7 @@ constexpr int PIN_TOUCH_SDA = 17;
 constexpr int PIN_TOUCH_SCL = 18;
 constexpr int PIN_TOUCH_RST = -1;
 constexpr int PIN_TOUCH_INT = -1;
+constexpr bool HAS_TCA9554 = true;
 #endif
 
 constexpr int TCA9554_ADDRESS = 0x20;

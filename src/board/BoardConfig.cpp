@@ -13,6 +13,8 @@ constexpr uint8_t kTca9554OutputReg = 0x01;
 constexpr uint8_t kTca9554ConfigReg = 0x03;
 bool gBatteryPowerHoldEnabled = false;
 bool gBatteryAdcPathEnabled = false;
+bool gTca9554Unavailable = !HAS_TCA9554;
+bool gTca9554MissingLogged = false;
 constexpr float kBatteryDividerRatio = 3.0f;
 constexpr float kBatteryVoltageOffset = 0.0f;
 
@@ -39,8 +41,13 @@ bool tca9554Write(uint8_t reg, uint8_t value) {
 }
 
 bool configureTca9554OutputPin(uint8_t pin, bool high) {
+  if (gTca9554Unavailable) {
+    return false;
+  }
+
   uint8_t output = 0;
   if (!tca9554Read(kTca9554OutputReg, output)) {
+    gTca9554Unavailable = true;
     return false;
   }
 
@@ -51,16 +58,22 @@ bool configureTca9554OutputPin(uint8_t pin, bool high) {
     output &= static_cast<uint8_t>(~mask);
   }
   if (!tca9554Write(kTca9554OutputReg, output)) {
+    gTca9554Unavailable = true;
     return false;
   }
 
   uint8_t config = 0xFF;
   if (!tca9554Read(kTca9554ConfigReg, config)) {
+    gTca9554Unavailable = true;
     return false;
   }
 
   config &= static_cast<uint8_t>(~mask);
-  return tca9554Write(kTca9554ConfigReg, config);
+  if (!tca9554Write(kTca9554ConfigReg, config)) {
+    gTca9554Unavailable = true;
+    return false;
+  }
+  return true;
 }
 
 void holdBatteryPowerIfAvailable() {
@@ -69,7 +82,15 @@ void holdBatteryPowerIfAvailable() {
   }
 
   if (!configureTca9554OutputPin(TCA9554_PIN_SYS_EN, true)) {
-    Serial.println("[board] TCA9554 not detected; battery power hold not configured");
+    if (!gTca9554MissingLogged) {
+      Serial.println("[board] TCA9554 not detected; battery power hold and ADC gate disabled");
+#if !defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
+      Serial.println(
+          "[board] Hint: if you use the 1.43\" AMOLED board, build target "
+          "waveshare_esp32s3_touch_amoled_143c");
+#endif
+      gTca9554MissingLogged = true;
+    }
     return;
   }
 
@@ -83,7 +104,10 @@ void enableBatteryAdcPathIfAvailable() {
   }
 
   if (!configureTca9554OutputPin(TCA9554_PIN_BATTERY_ADC_ENABLE, false)) {
-    Serial.println("[board] TCA9554 battery ADC gate not configured");
+    if (!gTca9554MissingLogged) {
+      Serial.println("[board] TCA9554 battery ADC gate not configured");
+      gTca9554MissingLogged = true;
+    }
     return;
   }
 
