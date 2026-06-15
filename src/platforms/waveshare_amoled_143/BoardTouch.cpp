@@ -3,18 +3,13 @@
 
 #include <algorithm>
 
-#include "drivers/touch/cst92xx/cst92xx.h"
-
 namespace {
 
 uint8_t gTouchAddress = Board::Config::TOUCH_I2C_ADDRESS;
-enum class TouchProtocol : uint8_t { Unknown = 0, Legacy, Cst92xx };
-TouchProtocol gProtocol = TouchProtocol::Unknown;
 constexpr uint8_t kProbeAddresses[] = {0x15, 0x14, 0x38, 0x5A};
-constexpr uint8_t kCountRegister = 2;
-constexpr uint8_t kPointRegister = 3;
-constexpr size_t kLegacyPacketLength = 7;
-const size_t kCstPacketLength = Cst92xxTouch::packetLength();
+constexpr uint8_t kStatusRegister = 0x02;
+constexpr uint8_t kCoordsRegister = 0x03;
+constexpr size_t kPacketLength = 6;
 
 bool probeTouchAddress(TwoWire &touchWire, uint8_t address) {
   touchWire.beginTransmission(address);
@@ -37,10 +32,9 @@ TwoWire &wire() { return Wire; }
 
 void resetController() { Board::System::resetTouchController(); }
 
-bool ready() { return Board::Config::PIN_TOUCH_IRQ < 0 || !digitalRead(Board::Config::PIN_TOUCH_IRQ); }
+bool ready() { return true; }
 
 bool configure() {
-  gProtocol = TouchProtocol::Unknown;
   TwoWire &touchWire = wire();
   for (uint8_t address : kProbeAddresses) {
     if (!probeTouchAddress(touchWire, address)) {
@@ -53,93 +47,73 @@ bool configure() {
   return false;
 }
 
-size_t packetLength() { return kCstPacketLength; }
+size_t packetLength() { return kPacketLength; }
 
-bool readLegacyPacket(uint8_t *buffer, size_t len) {
-  if (buffer == nullptr || len < kLegacyPacketLength) {
+bool readPacket(uint8_t *buffer, size_t len) {
+  if (buffer == nullptr || len < kPacketLength) {
     return false;
   }
 
   TwoWire &touchWire = wire();
+  uint8_t status[2] = {};
   touchWire.beginTransmission(gTouchAddress);
-  touchWire.write(kCountRegister);
+  touchWire.write(kStatusRegister);
   if (touchWire.endTransmission(false) != 0) {
     return false;
   }
 
-  if (touchWire.requestFrom(static_cast<uint8_t>(gTouchAddress), static_cast<size_t>(1), true) != 1) {
+  if (touchWire.requestFrom(static_cast<uint8_t>(gTouchAddress), static_cast<size_t>(2), true) != 2) {
     return false;
   }
 
-  const uint8_t count = touchWire.read();
-  buffer[0] = count;
-  if (count == 0) {
-    for (size_t i = 1; i < kLegacyPacketLength; ++i) {
+  status[0] = touchWire.read();
+  status[1] = touchWire.read();
+  const uint8_t touchCount = status[0];
+  const uint8_t touchEvent = static_cast<uint8_t>(status[1] >> 6);
+
+  // Waveshare CST820 examples treat event=1 as a non-press/release state.
+  if (touchCount == 0 || touchEvent == 0x01) {
+    for (size_t i = 0; i < kPacketLength; ++i) {
       buffer[i] = 0;
     }
     return true;
   }
 
-  if (count > 5) {
+  if (touchCount > 5) {
     return false;
   }
 
   touchWire.beginTransmission(gTouchAddress);
-  touchWire.write(kPointRegister);
+  touchWire.write(kCoordsRegister);
   if (touchWire.endTransmission(false) != 0) {
     return false;
   }
 
-  if (touchWire.requestFrom(static_cast<uint8_t>(gTouchAddress), static_cast<size_t>(6), true) != 6) {
+  if (touchWire.requestFrom(static_cast<uint8_t>(gTouchAddress), static_cast<size_t>(4), true) != 4) {
     return false;
   }
 
-  for (size_t i = 0; i < 6; ++i) {
-    buffer[i + 1] = touchWire.read();
+  buffer[0] = touchCount;
+  buffer[1] = touchEvent;
+  for (size_t i = 0; i < 4; ++i) {
+    buffer[2 + i] = touchWire.read();
   }
 
   return true;
 }
 
-bool readPacket(uint8_t *buffer, size_t len) {
-  if (buffer == nullptr || len < packetLength()) {
-    return false;
-  }
-
-  if (gProtocol != TouchProtocol::Legacy &&
-      Cst92xxTouch::readPacket(wire(), gTouchAddress, buffer, kCstPacketLength)) {
-    gProtocol = TouchProtocol::Cst92xx;
-    return true;
-  }
-
-  if (readLegacyPacket(buffer, len)) {
-    for (size_t i = kLegacyPacketLength; i < len; ++i) {
-      buffer[i] = 0;
-    }
-    gProtocol = TouchProtocol::Legacy;
-    return true;
-  }
-
-  return false;
-}
-
 bool decodePacket(const uint8_t *data, size_t len, BoardDrivers::Touch::Sample &sample) {
-  if (data == nullptr || len < kLegacyPacketLength) {
+  if (data == nullptr || len < kPacketLength) {
     return false;
   }
 
-  if (gProtocol == TouchProtocol::Cst92xx) {
-    return Cst92xxTouch::decodePacket(data, len, sample);
-  }
-
-  const uint8_t count = data[0];
-  if (count == 0) {
+  if (data[0] == 0) {
     sample.touched = false;
     return true;
   }
 
-  const uint16_t x = static_cast<uint16_t>(((data[1] & 0x0F) << 8) | data[2]);
-  const uint16_t y = static_cast<uint16_t>(((data[3] & 0x0F) << 8) | data[4]);
+  const uint16_t x = static_cast<uint16_t>(((data[2] & 0x0F) << 8) | data[3]);
+  const uint16_t y = static_cast<uint16_t>(((data[4] & 0x0F) << 8) | data[5]);
   sample.touched = true;
   sample.physicalX = clampPhysicalX(x);
   sample.physicalY = clampPhysicalY(y);

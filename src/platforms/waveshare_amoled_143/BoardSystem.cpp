@@ -107,7 +107,7 @@ void holdBacklightOffForDeepSleep() {
 
 void resetWakePeripherals() { Board::Power::resetWakePeripherals(); }
 
-void resetTouchController() { pulseDirectTouchResetPin(10, 50); }
+void resetTouchController() { pulseDirectTouchResetPin(200, 200); }
 
 void deepSleepUntilConfiguredWake() {
   const int wakePin = Config::PIN_DEEP_SLEEP_WAKE;
