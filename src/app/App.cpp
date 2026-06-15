@@ -1971,37 +1971,28 @@ void App::handleTouch(uint32_t nowMs) {
 }
 
 void App::applyPausedTouchGesture(const TouchEvent &event, uint32_t nowMs) {
+  const auto startsFromBottomMenuEdge = [&]() {
+#if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
+    constexpr int kStartEdgeBandPx = 84;
+    return static_cast<int>(pausedTouch_.startY) >= BoardConfig::DISPLAY_HEIGHT - kStartEdgeBandPx;
+#else
+    return false;
+#endif
+  };
+
   const auto isSettingsSwipeFromBottomCenter = [&](int deltaX, int deltaY, bool ended) {
 #if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
     if (!ended) {
       return false;
     }
     constexpr int kStartEdgeBandPx = 84;
-    constexpr int kCenterBandHalfWidthPx = 92;
     constexpr int kMinInwardSwipePx = 46;
-    const int centerX = BoardConfig::DISPLAY_WIDTH / 2;
-    const int centerY = BoardConfig::DISPLAY_HEIGHT / 2;
     const bool startedFromBottomBand =
         static_cast<int>(pausedTouch_.startY) >= BoardConfig::DISPLAY_HEIGHT - kStartEdgeBandPx;
-    const bool startedFromBottomCenter =
-        abs(static_cast<int>(pausedTouch_.startX) - centerX) <= kCenterBandHalfWidthPx;
-    const bool startedFromRightBand =
-        static_cast<int>(pausedTouch_.startX) >= BoardConfig::DISPLAY_WIDTH - kStartEdgeBandPx;
-    const bool startedFromLeftBand = static_cast<int>(pausedTouch_.startX) <= kStartEdgeBandPx;
-    const bool startedFromMidHeight =
-        abs(static_cast<int>(pausedTouch_.startY) - centerY) <= kCenterBandHalfWidthPx;
-
     const bool upwardFromBottom =
-        startedFromBottomBand && startedFromBottomCenter && abs(deltaX) <= kTapSlopPx * 3 &&
-        (-deltaY) >= kMinInwardSwipePx;
-    const bool inwardFromRight =
-        startedFromRightBand && startedFromMidHeight && abs(deltaY) <= kTapSlopPx * 3 &&
-        (-deltaX) >= kMinInwardSwipePx;
-    const bool inwardFromLeft =
-        startedFromLeftBand && startedFromMidHeight && abs(deltaY) <= kTapSlopPx * 3 &&
-        deltaX >= kMinInwardSwipePx;
+        startedFromBottomBand && abs(deltaX) <= kTapSlopPx * 3 && (-deltaY) >= kMinInwardSwipePx;
 
-    return upwardFromBottom || inwardFromRight || inwardFromLeft;
+    return upwardFromBottom;
 #else
     (void)deltaX;
     (void)deltaY;
@@ -2055,6 +2046,7 @@ void App::applyPausedTouchGesture(const TouchEvent &event, uint32_t nowMs) {
   const bool tapLike = absDeltaX <= static_cast<int>(kTapSlopPx) &&
                        absDeltaY <= static_cast<int>(kTapSlopPx);
   const bool previewBrowseMode = contextViewVisible_ && !scrollModeEnabled();
+  const bool startedFromBottomMenuEdge = startsFromBottomMenuEdge();
   bool wpmSwipeZoneAllowed = true;
 #if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
   const int centerX = BoardConfig::DISPLAY_WIDTH / 2;
@@ -2108,7 +2100,7 @@ void App::applyPausedTouchGesture(const TouchEvent &event, uint32_t nowMs) {
   }
 
   if (!previewBrowseMode && !ended && pausedTouchIntent_ == TouchIntent::None &&
-      pressDurationMs >= kTouchPlayHoldMs && tapLike) {
+      pressDurationMs >= kTouchPlayHoldMs && tapLike && !startedFromBottomMenuEdge) {
     resetReaderTapTracking();
     touchPlayHeld_ = true;
     pausedTouchIntent_ = TouchIntent::PlayHold;
@@ -2173,6 +2165,11 @@ void App::applyPausedTouchGesture(const TouchEvent &event, uint32_t nowMs) {
   if (ended) {
     pausedTouch_.active = false;
     pausedTouchIntent_ = TouchIntent::None;
+    if (isSettingsSwipeFromBottomCenter(deltaX, deltaY, ended)) {
+      openMainMenu(nowMs);
+      openSettings();
+      return;
+    }
     if (tapLike && handleBatteryBadgeTap(event.x, event.y, nowMs)) {
       return;
     }
