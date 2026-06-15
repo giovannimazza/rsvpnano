@@ -3,6 +3,13 @@
 # Usage: .\tools\flash_143c.ps1
 
 $env_name = "waveshare_esp32s3_touch_amoled_143c"
+$stale = "src\storage\SeedBooks.generated.h"
+
+# Remove stale generated file if left over from old builds
+if (Test-Path $stale) {
+    Write-Host "==> Removing stale $stale..." -ForegroundColor Yellow
+    Remove-Item $stale -Force
+}
 
 Write-Host "==> Flashing filesystem (books)..." -ForegroundColor Cyan
 pio run -e $env_name -t uploadfs
