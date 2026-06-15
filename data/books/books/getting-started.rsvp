@@ -1,0 +1,13 @@
+@rsvp 1
+@title Getting Started
+@author RSVP Nano
+@source built-in seed
+@chapter Open This Book
+@para
+This book is bundled into flash so it appears in Books right after you flash the firmware.
+@para
+Add more seed files here to preload your own library.
+
+@chapter Next Step
+@para
+You can replace this demo with your own .rsvp or .txt content later without changing the firmware UI.
