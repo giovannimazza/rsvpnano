@@ -1778,6 +1778,12 @@ bool App::handlePreviousSentenceTap(uint16_t x, uint16_t y, uint32_t nowMs) {
 }
 
 bool App::handleFooterMetricTap(uint16_t x, uint16_t y, uint32_t nowMs) {
+#if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
+  (void)x;
+  (void)y;
+  (void)nowMs;
+  return false;
+#else
   if (isActivelyReading() || !readerFooterVisible() || !isFooterMetricTap(x, y)) {
     return false;
   }
@@ -1813,6 +1819,7 @@ bool App::handleFooterMetricTap(uint16_t x, uint16_t y, uint32_t nowMs) {
   }
   Serial.printf("[reader] footer metric=%s\n", modeName);
   return true;
+#endif
 }
 
 bool App::handleBatteryBadgeTap(uint16_t x, uint16_t y, uint32_t nowMs) {
