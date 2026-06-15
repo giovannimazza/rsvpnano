@@ -1980,23 +1980,21 @@ void App::applyPausedTouchGesture(const TouchEvent &event, uint32_t nowMs) {
 #endif
   };
 
-  const auto isSettingsSwipeFromBottomCenter = [&](int deltaX, int deltaY, bool ended) {
+  const auto isSettingsSwipeFromBottomCenter = [&](int deltaX, int deltaY) {
 #if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
-    if (!ended) {
-      return false;
-    }
     constexpr int kStartEdgeBandPx = 84;
     constexpr int kMinInwardSwipePx = 46;
     const bool startedFromBottomBand =
         static_cast<int>(pausedTouch_.startY) >= BoardConfig::DISPLAY_HEIGHT - kStartEdgeBandPx;
+    const bool verticalSwipe = abs(deltaY) > abs(deltaX) + static_cast<int>(kAxisBiasPx);
     const bool upwardFromBottom =
-        startedFromBottomBand && abs(deltaX) <= kTapSlopPx * 3 && (-deltaY) >= kMinInwardSwipePx;
+        startedFromBottomBand && verticalSwipe && abs(deltaX) <= kTapSlopPx * 3 &&
+        (-deltaY) >= kMinInwardSwipePx;
 
     return upwardFromBottom;
 #else
     (void)deltaX;
     (void)deltaY;
-    (void)ended;
     return false;
 #endif
   };
@@ -2059,15 +2057,19 @@ void App::applyPausedTouchGesture(const TouchEvent &event, uint32_t nowMs) {
       static_cast<int>(pausedTouch_.startY) <= maxCenterY;
 #endif
 
+  if (isSettingsSwipeFromBottomCenter(deltaX, deltaY)) {
+    pausedTouch_.active = false;
+    pausedTouchIntent_ = TouchIntent::None;
+    touchPlayHeld_ = false;
+    openMainMenu(nowMs);
+    openSettings();
+    return;
+  }
+
   if (state_ == AppState::Playing) {
     if (ended) {
       pausedTouch_.active = false;
       pausedTouchIntent_ = TouchIntent::None;
-      if (isSettingsSwipeFromBottomCenter(deltaX, deltaY, ended)) {
-        openMainMenu(nowMs);
-        openSettings();
-        return;
-      }
       if (tapLike) {
         if (handleBatteryBadgeTap(event.x, event.y, nowMs)) {
           return;
@@ -2076,13 +2078,6 @@ void App::applyPausedTouchGesture(const TouchEvent &event, uint32_t nowMs) {
           return;
         }
 
-        if (isSettingsSwipeFromBottomCenter(deltaX, deltaY, ended)) {
-          pausedTouch_.active = false;
-          pausedTouchIntent_ = TouchIntent::None;
-          openMainMenu(nowMs);
-          openSettings();
-          return;
-        }
         if (handlePreviousSentenceTap(event.x, event.y, nowMs)) {
           return;
         }
@@ -2165,11 +2160,6 @@ void App::applyPausedTouchGesture(const TouchEvent &event, uint32_t nowMs) {
   if (ended) {
     pausedTouch_.active = false;
     pausedTouchIntent_ = TouchIntent::None;
-    if (isSettingsSwipeFromBottomCenter(deltaX, deltaY, ended)) {
-      openMainMenu(nowMs);
-      openSettings();
-      return;
-    }
     if (tapLike && handleBatteryBadgeTap(event.x, event.y, nowMs)) {
       return;
     }
