@@ -138,9 +138,17 @@ bool UsbMassStorageManager::configureMsc() {
 bool UsbMassStorageManager::beginSdCard() {
 #if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
   blockCount_ = 0;
-  blockSize_ = 0;
+  blockSize_ = kUsbBlockSize;
   flashEraseSize_ = 0;
   cardReady_ = false;
+
+  if (flashPageBuffer_ == nullptr) {
+    flashPageBuffer_ = static_cast<uint8_t *>(heap_caps_malloc(4096, MALLOC_CAP_INTERNAL));
+  }
+  if (flashPageBuffer_ == nullptr) {
+    Serial.println("[usb-msc] failed to allocate WL sector buffer");
+    return false;
+  }
 
   flashPartition_ = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_FAT,
                                              "ffat");
@@ -171,17 +179,6 @@ bool UsbMassStorageManager::beginSdCard() {
     return false;
   }
   flashEraseSize_ = static_cast<uint32_t>(flashSectorSize_);
-  blockSize_ = static_cast<uint16_t>(flashSectorSize_);
-
-  if (flashPageBuffer_ == nullptr) {
-    flashPageBuffer_ = static_cast<uint8_t *>(heap_caps_malloc(flashEraseSize_, MALLOC_CAP_INTERNAL));
-  }
-  if (flashPageBuffer_ == nullptr) {
-    Serial.println("[usb-msc] failed to allocate WL sector buffer");
-    wl_unmount(flashWlHandle_);
-    flashWlHandle_ = WL_INVALID_HANDLE;
-    return false;
-  }
 
   const size_t usableSize = wl_size(flashWlHandle_);
   blockCount_ = static_cast<uint32_t>(usableSize / blockSize_);
