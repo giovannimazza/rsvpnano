@@ -235,6 +235,7 @@ enum QuickSettingsItem : size_t {
 enum QuickSyncItem : size_t {
   QuickSyncWifi,
   QuickSyncUsb,
+  QuickSyncBack,
   QuickSyncItemCount,
 };
 
@@ -3395,6 +3396,9 @@ void App::selectQuickSyncItem(uint32_t nowMs) {
     case QuickSyncUsb:
       enterUsbTransfer(nowMs);
       return;
+    case QuickSyncBack:
+      openQuickSettings(nowMs);
+      return;
     default:
       return;
   }
@@ -6445,6 +6449,7 @@ void App::renderQuickSync() {
   items.reserve(QuickSyncItemCount);
   items.push_back("Wi-Fi Sync");
   items.push_back("USB Sync");
+  items.push_back("Back");
   display_.renderMenu(items, quickSyncSelectedIndex_);
 }
 
