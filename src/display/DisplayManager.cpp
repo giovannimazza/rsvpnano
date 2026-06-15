@@ -1661,6 +1661,9 @@ void DisplayManager::drawBatteryBadge(int logicalWidth, int logicalHeight) {
 }
 
 void DisplayManager::drawBrightnessToastBadge(int logicalWidth, int logicalHeight) {
+#if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
+  return;
+#endif
   if (brightnessOverlayText_.isEmpty()) {
     return;
   }

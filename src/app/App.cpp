@@ -56,7 +56,7 @@ constexpr uint16_t kQuickSettingsSwipeBottomZonePx =
     kReaderChromeBottomMarginPx + (Board::Config::ENABLE_BOTTOM_EDGE_QUICK_SETTINGS_SWIPE ? 64 : 0);
 constexpr uint16_t kMenuSwipeTriggerPx = 72;
 constexpr bool kRoundDisplay = Board::Config::DISPLAY_WIDTH == Board::Config::DISPLAY_HEIGHT;
-constexpr uint16_t kRoundSwipeZoneExtraPx = 28;
+constexpr uint16_t kRoundSwipeZoneExtraPx = 60;
 constexpr uint16_t kRoundSwipeFaceInsetPx = 10;
 constexpr uint16_t kScrubStepPx = 22;
 constexpr uint16_t kBrowseNeutralZonePx = 14;
@@ -2260,6 +2260,9 @@ DisplayManager::ReaderChrome App::readerChrome() const {
   chrome.showBattery = !reading || readerBatteryVisibleWhilePlaying_;
   chrome.showChapter = chapterLabelEnabled_ && (!reading || readerChapterVisibleWhilePlaying_);
   chrome.showProgress = !reading || readerProgressVisibleWhilePlaying_;
+#if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
+  chrome.showProgress = reading;
+#endif
   chrome.showPreviousSentenceHint = !contextViewVisible_ || scrollModeEnabled();
   chrome.showEdgeMenuHints = !reading;
   return chrome;
