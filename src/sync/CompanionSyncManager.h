@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <FS.h>
+#include <DNSServer.h>
 #include <Preferences.h>
 #include <WebServer.h>
 
@@ -75,6 +76,7 @@ class CompanionSyncManager {
   static CompanionSyncManager *instance_;
 
   WebServer server_{80};
+  DNSServer dnsServer_;
   File uploadFile_;
   String uploadFinalPath_;
   String uploadTmpPath_;

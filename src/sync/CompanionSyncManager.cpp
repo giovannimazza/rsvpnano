@@ -19,6 +19,9 @@ namespace {
 using namespace settings;
 
 constexpr const char *kMdnsName = "rsvp-nano";
+const IPAddress kApIp(192, 168, 4, 1);
+const IPAddress kApGateway(192, 168, 4, 1);
+const IPAddress kApSubnet(255, 255, 255, 0);
 constexpr const char *kRssConfigPath = "/config/rss.conf";
 constexpr size_t kMaxMetadataLineChars = 160;
 constexpr size_t kMaxSettingsPatchBytes = 2048;
@@ -543,6 +546,9 @@ void CompanionSyncManager::update() {
   if (!active_ || !serverStarted_) {
     return;
   }
+  if (networkMode_ == NetworkMode::AccessPoint) {
+    dnsServer_.processNextRequest();
+  }
   server_.handleClient();
 }
 
@@ -646,6 +652,11 @@ bool CompanionSyncManager::startAccessPoint() {
   statusLine2_ = ssid;
   networkSsid_ = ssid;
   WiFi.mode(WIFI_AP);
+  if (!WiFi.softAPConfig(kApIp, kApGateway, kApSubnet)) {
+    Serial.println("[sync] softAPConfig failed");
+    return false;
+  }
+
   if (!WiFi.softAP(ssid.c_str())) {
     Serial.println("[sync] softAP failed");
     return false;
@@ -673,6 +684,9 @@ bool CompanionSyncManager::startServer() {
   server_.onNotFound(handleNotFoundStatic);
   server_.begin();
   serverStarted_ = true;
+  if (networkMode_ == NetworkMode::AccessPoint) {
+    dnsServer_.start(53, "*", kApIp);
+  }
 
   if (networkMode_ == NetworkMode::Station && MDNS.begin(kMdnsName)) {
     MDNS.addService("http", "tcp", 80);
@@ -682,6 +696,7 @@ bool CompanionSyncManager::startServer() {
 
 void CompanionSyncManager::stopServer() {
   if (serverStarted_) {
+    dnsServer_.stop();
     server_.stop();
     MDNS.end();
   }
@@ -978,6 +993,11 @@ void CompanionSyncManager::handleBookUpload() {
 }
 
 void CompanionSyncManager::handleNotFound() {
+  if (networkMode_ == NetworkMode::AccessPoint) {
+    server_.sendHeader("Location", "/");
+    server_.send(302, "text/plain", "");
+    return;
+  }
   server_.send(404, "application/json", "{\"ok\":false,\"error\":\"Not found\"}");
 }
 
