@@ -7,9 +7,6 @@
 #include <esp_heap_caps.h>
 #include <esp_log.h>
 #include <esp_partition.h>
-#if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
-#include <wear_levelling.h>
-#endif
 #include <sdmmc_cmd.h>
 #include <tusb.h>
 #include <driver/sdmmc_host.h>
@@ -139,14 +136,15 @@ bool UsbMassStorageManager::beginSdCard() {
 #if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
   blockCount_ = 0;
   blockSize_ = kUsbBlockSize;
-  flashEraseSize_ = 0;
+  flashEraseSize_ = 4096;
   cardReady_ = false;
 
   if (flashPageBuffer_ == nullptr) {
-    flashPageBuffer_ = static_cast<uint8_t *>(heap_caps_malloc(4096, MALLOC_CAP_INTERNAL));
+    flashPageBuffer_ = static_cast<uint8_t *>(
+        heap_caps_malloc(flashEraseSize_, MALLOC_CAP_INTERNAL));
   }
   if (flashPageBuffer_ == nullptr) {
-    Serial.println("[usb-msc] failed to allocate WL sector buffer");
+    Serial.println("[usb-msc] failed to allocate flash page buffer");
     return false;
   }
 
@@ -157,31 +155,13 @@ bool UsbMassStorageManager::beginSdCard() {
     return false;
   }
 
-  if (flashWlHandle_ != WL_INVALID_HANDLE) {
-    wl_unmount(flashWlHandle_);
-    flashWlHandle_ = WL_INVALID_HANDLE;
-  }
-
-  const esp_err_t wlErr = wl_mount(flashPartition_, &flashWlHandle_);
-  if (wlErr != ESP_OK) {
-    Serial.printf("[usb-msc] WL mount failed: 0x%x\n", wlErr);
+  if ((flashPartition_->size % blockSize_) != 0) {
+    Serial.printf("[usb-msc] flash partition size not aligned: %lu\n",
+                  static_cast<unsigned long>(flashPartition_->size));
     return false;
   }
 
-  flashSectorSize_ = wl_sector_size(flashWlHandle_);
-  if (flashSectorSize_ == 0) {
-    Serial.println("[usb-msc] WL sector size is zero");
-    return false;
-  }
-  if ((flashSectorSize_ & (flashSectorSize_ - 1)) != 0) {
-    Serial.printf("[usb-msc] WL sector size not power-of-two: %u\n",
-                  static_cast<unsigned int>(flashSectorSize_));
-    return false;
-  }
-  flashEraseSize_ = static_cast<uint32_t>(flashSectorSize_);
-
-  const size_t usableSize = wl_size(flashWlHandle_);
-  blockCount_ = static_cast<uint32_t>(usableSize / blockSize_);
+  blockCount_ = static_cast<uint32_t>(flashPartition_->size / blockSize_);
   cardReady_ = true;
   Serial.printf("[usb-msc] flash ready for USB (%lu MB)\n",
                 static_cast<unsigned long>(cardSizeBytes() / (1024ULL * 1024ULL)));
@@ -260,14 +240,9 @@ bool UsbMassStorageManager::beginSdCard() {
 
 void UsbMassStorageManager::endSdCard() {
 #if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
-  if (flashWlHandle_ != WL_INVALID_HANDLE) {
-    wl_unmount(flashWlHandle_);
-    flashWlHandle_ = WL_INVALID_HANDLE;
-  }
   flashPartition_ = nullptr;
   cardReady_ = false;
   blockCount_ = 0;
-  flashSectorSize_ = 0;
   if (flashPageBuffer_ != nullptr) {
     heap_caps_free(flashPageBuffer_);
     flashPageBuffer_ = nullptr;
@@ -318,15 +293,14 @@ int32_t UsbMassStorageManager::readSectors(uint32_t lba, uint32_t offset, void *
 #if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
   const uint64_t absoluteStart = (static_cast<uint64_t>(lba) * blockSize_) + offset;
   const uint64_t absoluteEnd = absoluteStart + bufsize;
-  const uint64_t usableSize = wl_size(flashWlHandle_);
-  if (absoluteStart >= usableSize) {
+  if (absoluteStart >= flashPartition_->size) {
     return -1;
   }
-  const uint64_t cappedEnd = std::min<uint64_t>(absoluteEnd, usableSize);
+  const uint64_t cappedEnd = std::min<uint64_t>(absoluteEnd, flashPartition_->size);
   const size_t readSize = static_cast<size_t>(cappedEnd - absoluteStart);
-  const esp_err_t err = wl_read(flashWlHandle_, absoluteStart, buffer, readSize);
+  const esp_err_t err = esp_partition_read(flashPartition_, absoluteStart, buffer, readSize);
   if (err != ESP_OK) {
-    Serial.printf("[usb-msc] WL read failed offset=%llu err=0x%x\n",
+    Serial.printf("[usb-msc] flash read failed offset=%llu err=0x%x\n",
                   static_cast<unsigned long long>(absoluteStart), err);
     return -1;
   }
@@ -367,15 +341,14 @@ int32_t UsbMassStorageManager::writeSectors(uint32_t lba, uint32_t offset, uint8
   }
 
 #if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
-  if (flashWlHandle_ == WL_INVALID_HANDLE || flashPageBuffer_ == nullptr) {
+  if (flashPartition_ == nullptr || flashPageBuffer_ == nullptr) {
     return -1;
   }
 
   uint32_t written = 0;
   while (written < bufsize) {
     const uint64_t absolute = (static_cast<uint64_t>(lba) * blockSize_) + offset + written;
-    const uint64_t usableSize = wl_size(flashWlHandle_);
-    if (absolute >= usableSize) {
+    if (absolute >= flashPartition_->size) {
       return written > 0 ? static_cast<int32_t>(written) : -1;
     }
 
@@ -384,25 +357,25 @@ int32_t UsbMassStorageManager::writeSectors(uint32_t lba, uint32_t offset, uint8
     const uint32_t bytesThisPage =
         std::min<uint32_t>(flashEraseSize_ - pageOffset, bufsize - written);
 
-    esp_err_t err = wl_read(flashWlHandle_, pageStart, flashPageBuffer_, flashEraseSize_);
+    esp_err_t err = esp_partition_read(flashPartition_, pageStart, flashPageBuffer_, flashEraseSize_);
     if (err != ESP_OK) {
-      Serial.printf("[usb-msc] WL pre-read failed offset=%llu err=0x%x\n",
+      Serial.printf("[usb-msc] flash pre-read failed offset=%llu err=0x%x\n",
                     static_cast<unsigned long long>(pageStart), err);
       return written > 0 ? static_cast<int32_t>(written) : -1;
     }
 
     std::memcpy(flashPageBuffer_ + pageOffset, buffer + written, bytesThisPage);
 
-    err = wl_erase_range(flashWlHandle_, pageStart, flashEraseSize_);
+    err = esp_partition_erase_range(flashPartition_, pageStart, flashEraseSize_);
     if (err != ESP_OK) {
-      Serial.printf("[usb-msc] WL erase failed offset=%llu err=0x%x\n",
+      Serial.printf("[usb-msc] flash erase failed offset=%llu err=0x%x\n",
                     static_cast<unsigned long long>(pageStart), err);
       return written > 0 ? static_cast<int32_t>(written) : -1;
     }
 
-    err = wl_write(flashWlHandle_, pageStart, flashPageBuffer_, flashEraseSize_);
+    err = esp_partition_write(flashPartition_, pageStart, flashPageBuffer_, flashEraseSize_);
     if (err != ESP_OK) {
-      Serial.printf("[usb-msc] WL write failed offset=%llu err=0x%x\n",
+      Serial.printf("[usb-msc] flash write failed offset=%llu err=0x%x\n",
                     static_cast<unsigned long long>(pageStart), err);
       return written > 0 ? static_cast<int32_t>(written) : -1;
     }

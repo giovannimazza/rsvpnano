@@ -13,9 +13,6 @@
 
 #include <esp_partition.h>
 #include <driver/sdmmc_types.h>
-#if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
-#include <wear_levelling.h>
-#endif
 
 class UsbMassStorageManager {
  public:
@@ -51,17 +48,11 @@ class UsbMassStorageManager {
 
   sdmmc_card_t card_ = {};
   const esp_partition_t *flashPartition_ = nullptr;
-#if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
-  wl_handle_t flashWlHandle_ = WL_INVALID_HANDLE;
-#endif
   uint8_t *sectorBuffer_ = nullptr;
   uint8_t *flashPageBuffer_ = nullptr;
   uint32_t blockCount_ = 0;
   uint16_t blockSize_ = 512;
   uint32_t flashEraseSize_ = 4096;
-#if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
-  size_t flashSectorSize_ = 0;
-#endif
   bool active_ = false;
   bool cardReady_ = false;
   bool ejected_ = false;
