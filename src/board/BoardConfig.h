@@ -15,7 +15,7 @@ enum class UiOrientation : uint8_t {
 // Alternate build target: waveshare_esp32s3_touch_amoled_143c.
 #if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
 constexpr int PIN_BOOT_BUTTON = 0;
-constexpr int PIN_PWR_BUTTON = 16;
+constexpr int PIN_PWR_BUTTON = -1;
 constexpr int PIN_BATTERY_ADC = 4;
 
 constexpr int PIN_LCD_TE = 7;

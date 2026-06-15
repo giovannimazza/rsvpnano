@@ -607,10 +607,13 @@ App::App() : button_(BoardConfig::PIN_BOOT_BUTTON), powerButton_(BoardConfig::PI
 void App::begin() {
   BoardConfig::begin();
   button_.begin();
-  powerButton_.begin();
+  if (BoardConfig::PIN_PWR_BUTTON >= 0) {
+    powerButton_.begin();
+  }
   bootButtonReleasedSinceBoot_ = !button_.isHeld();
   bootButtonLongPressHandled_ = false;
-  powerButtonReleasedSinceBoot_ = !powerButton_.isHeld();
+  powerButtonReleasedSinceBoot_ =
+      BoardConfig::PIN_PWR_BUTTON >= 0 ? !powerButton_.isHeld() : true;
   powerButtonLongPressHandled_ = false;
   storage_.setStatusCallback(&App::handleStorageStatus, this);
   preferences_.begin(kPrefsNamespace, false);
@@ -777,11 +780,15 @@ void App::begin() {
 
 void App::update(uint32_t nowMs) {
   button_.update(nowMs);
-  powerButton_.update(nowMs);
+  if (BoardConfig::PIN_PWR_BUTTON >= 0) {
+    powerButton_.update(nowMs);
+  }
   const bool standbyComboConsumed = handleStandbyCombo(nowMs);
   if (!standbyComboConsumed) {
     handleBootButton(nowMs);
-    handlePowerButton(nowMs);
+    if (BoardConfig::PIN_PWR_BUTTON >= 0) {
+      handlePowerButton(nowMs);
+    }
   }
   if (powerOffStarted_) {
     return;
@@ -4711,7 +4718,13 @@ void App::enterPowerOff(uint32_t nowMs) {
     delay(10);
   }
 
-  esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(BoardConfig::PIN_PWR_BUTTON), 0);
+  if (BoardConfig::PIN_PWR_BUTTON >= 0) {
+    esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(BoardConfig::PIN_PWR_BUTTON), 0);
+  } else {
+    BoardConfig::lightSleepUntilBootButton();
+    wakeFromSleep();
+    return;
+  }
   esp_deep_sleep_start();
 }
 
@@ -4738,10 +4751,13 @@ void App::wakeFromSleep() {
 
   BoardConfig::begin();
   button_.begin();
-  powerButton_.begin();
+  if (BoardConfig::PIN_PWR_BUTTON >= 0) {
+    powerButton_.begin();
+  }
   bootButtonReleasedSinceBoot_ = !button_.isHeld();
   bootButtonLongPressHandled_ = false;
-  powerButtonReleasedSinceBoot_ = !powerButton_.isHeld();
+  powerButtonReleasedSinceBoot_ =
+      BoardConfig::PIN_PWR_BUTTON >= 0 ? !powerButton_.isHeld() : true;
   powerButtonLongPressHandled_ = false;
   powerOffStarted_ = false;
   updateBatteryStatus(nowMs, true);

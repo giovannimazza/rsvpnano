@@ -3,6 +3,16 @@
 ButtonHandler::ButtonHandler(int pin) : pin_(pin) {}
 
 void ButtonHandler::begin() {
+  if (pin_ < 0) {
+    held_ = false;
+    pressedEvent_ = false;
+    releasedEvent_ = false;
+    lastEdgeMs_ = millis();
+    pressStartedMs_ = 0;
+    lastHoldDurationMs_ = 0;
+    return;
+  }
+
   pinMode(pin_, INPUT_PULLUP);
   held_ = !digitalRead(pin_);
   pressedEvent_ = false;
@@ -13,6 +23,13 @@ void ButtonHandler::begin() {
 }
 
 void ButtonHandler::update(uint32_t nowMs) {
+  if (pin_ < 0) {
+    pressedEvent_ = false;
+    releasedEvent_ = false;
+    held_ = false;
+    return;
+  }
+
   pressedEvent_ = false;
   releasedEvent_ = false;
 

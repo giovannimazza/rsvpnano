@@ -144,7 +144,9 @@ uint8_t batteryPercentForVoltage(float voltage) {
 
 void begin() {
   pinMode(PIN_BOOT_BUTTON, INPUT_PULLUP);
-  pinMode(PIN_PWR_BUTTON, INPUT_PULLUP);
+  if (PIN_PWR_BUTTON >= 0) {
+    pinMode(PIN_PWR_BUTTON, INPUT_PULLUP);
+  }
   gpio_deep_sleep_hold_dis();
   if (HAS_LCD_BACKLIGHT) {
     gpio_hold_dis(static_cast<gpio_num_t>(PIN_LCD_BACKLIGHT));
