@@ -1,7 +1,7 @@
 #include "board/BoardSystem.h"
 #include "board/BoardTouch.h"
 
-#include "drivers/touch/ft6336/ft6336.h"
+#include "drivers/touch/cst92xx/cst92xx.h"
 
 namespace {
 
@@ -35,7 +35,7 @@ bool ready() { return Board::Config::PIN_TOUCH_IRQ < 0 || !digitalRead(Board::Co
 
 bool configure() {
   TwoWire &touchWire = wire();
-  const uint8_t candidates[] = {Board::Config::TOUCH_I2C_ADDRESS, 0x15, 0x14, 0x38};
+  const uint8_t candidates[] = {Board::Config::TOUCH_I2C_ADDRESS, 0x14, 0x38};
   for (uint8_t address : candidates) {
     if (!probeTouchAddress(touchWire, address)) {
       continue;
@@ -47,14 +47,14 @@ bool configure() {
   return false;
 }
 
-size_t packetLength() { return Ft6336Touch::packetLength(); }
+size_t packetLength() { return Cst92xxTouch::packetLength(); }
 
 bool readPacket(uint8_t *buffer, size_t len) {
-  return Ft6336Touch::readPacket(wire(), gTouchAddress, buffer, len);
+  return Cst92xxTouch::readPacket(wire(), gTouchAddress, buffer, len);
 }
 
 bool decodePacket(const uint8_t *data, size_t len, BoardDrivers::Touch::Sample &sample) {
-  return Ft6336Touch::decodePacket(data, len, sample);
+  return Cst92xxTouch::decodePacket(data, len, sample);
 }
 
 }  // namespace Board::Touch
