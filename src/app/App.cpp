@@ -1943,6 +1943,16 @@ void App::handleTouch(uint32_t nowMs) {
 }
 
 void App::applyPausedTouchGesture(const TouchEvent &event, uint32_t nowMs) {
+  const auto isMenuHotCornerTap = [&](bool tapLike) {
+#if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
+    constexpr uint16_t kMenuHotCornerPx = 56;
+    return tapLike && event.x <= kMenuHotCornerPx && event.y <= kMenuHotCornerPx;
+#else
+    (void)tapLike;
+    return false;
+#endif
+  };
+
   if (event.phase == TouchPhase::End && touchPlayHeld_) {
     resetReaderTapTracking();
     pausedTouch_.active = false;
@@ -1994,6 +2004,10 @@ void App::applyPausedTouchGesture(const TouchEvent &event, uint32_t nowMs) {
       pausedTouch_.active = false;
       pausedTouchIntent_ = TouchIntent::None;
       if (tapLike) {
+        if (isMenuHotCornerTap(tapLike)) {
+          openMainMenu(nowMs);
+          return;
+        }
         if (handleBatteryBadgeTap(event.x, event.y, nowMs)) {
           return;
         }
@@ -2081,6 +2095,10 @@ void App::applyPausedTouchGesture(const TouchEvent &event, uint32_t nowMs) {
   if (ended) {
     pausedTouch_.active = false;
     pausedTouchIntent_ = TouchIntent::None;
+    if (isMenuHotCornerTap(tapLike)) {
+      openMainMenu(nowMs);
+      return;
+    }
     if (tapLike && handleBatteryBadgeTap(event.x, event.y, nowMs)) {
       return;
     }
