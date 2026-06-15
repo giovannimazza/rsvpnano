@@ -5767,12 +5767,16 @@ void App::playFocusTimerCompletionCue() {
     return;
   }
 
+#if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
+  return;
+#else
   for (int i = 0; i < 3; ++i) {
     digitalWrite(BoardConfig::PIN_LCD_BACKLIGHT, HIGH);
     delay(55);
     digitalWrite(BoardConfig::PIN_LCD_BACKLIGHT, LOW);
     delay(45);
   }
+#endif
 }
 
 bool App::scrollModeEnabled() const { return readerMode_ == ReaderMode::Scroll; }

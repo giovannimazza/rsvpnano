@@ -146,9 +146,11 @@ void begin() {
   pinMode(PIN_BOOT_BUTTON, INPUT_PULLUP);
   pinMode(PIN_PWR_BUTTON, INPUT_PULLUP);
   gpio_deep_sleep_hold_dis();
-  gpio_hold_dis(static_cast<gpio_num_t>(PIN_LCD_BACKLIGHT));
-  pinMode(PIN_LCD_BACKLIGHT, OUTPUT);
-  digitalWrite(PIN_LCD_BACKLIGHT, LOW);
+  if (HAS_LCD_BACKLIGHT) {
+    gpio_hold_dis(static_cast<gpio_num_t>(PIN_LCD_BACKLIGHT));
+    pinMode(PIN_LCD_BACKLIGHT, OUTPUT);
+    digitalWrite(PIN_LCD_BACKLIGHT, LOW);
+  }
 
   Wire.begin(PIN_TOUCH_SDA, PIN_TOUCH_SCL);
   Wire.setClock(300000);
@@ -176,17 +178,19 @@ void lightSleepUntilBootButton() {
 }
 
 void holdBacklightOffForDeepSleep() {
-  const gpio_num_t backlightPin = static_cast<gpio_num_t>(PIN_LCD_BACKLIGHT);
+  if (HAS_LCD_BACKLIGHT) {
+    const gpio_num_t backlightPin = static_cast<gpio_num_t>(PIN_LCD_BACKLIGHT);
 
-  // The LCD backlight is active-low. Hold the inactive level while the ESP32 is in deep sleep,
-  // because PWM output stops there and can otherwise leave the backlight pin floating.
-  analogWrite(PIN_LCD_BACKLIGHT, 255);
-  pinMode(PIN_LCD_BACKLIGHT, OUTPUT);
-  digitalWrite(PIN_LCD_BACKLIGHT, HIGH);
-  gpio_set_direction(backlightPin, GPIO_MODE_OUTPUT);
-  gpio_set_level(backlightPin, 1);
-  gpio_hold_en(backlightPin);
-  gpio_deep_sleep_hold_en();
+    // The LCD backlight is active-low. Hold the inactive level while the ESP32 is in deep sleep,
+    // because PWM output stops there and can otherwise leave the backlight pin floating.
+    analogWrite(PIN_LCD_BACKLIGHT, 255);
+    pinMode(PIN_LCD_BACKLIGHT, OUTPUT);
+    digitalWrite(PIN_LCD_BACKLIGHT, HIGH);
+    gpio_set_direction(backlightPin, GPIO_MODE_OUTPUT);
+    gpio_set_level(backlightPin, 1);
+    gpio_hold_en(backlightPin);
+    gpio_deep_sleep_hold_en();
+  }
 }
 
 bool readBatteryStatus(BatteryStatus &status) {

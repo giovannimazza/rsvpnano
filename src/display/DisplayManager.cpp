@@ -14,7 +14,7 @@
 #include "display/EmbeddedOpenDyslexicFont70.h"
 #include "display/EmbeddedSerifFont.h"
 #include "display/EmbeddedSerifFont70.h"
-#include "display/axs15231b.h"
+#include "display/PanelDriver.h"
 #include "text/LatinText.h"
 
 namespace {
@@ -967,7 +967,7 @@ bool DisplayManager::begin() {
   lastRenderKey_ = "";
   fillScreen(backgroundColor());
   applyBrightness();
-  ESP_LOGI(kDisplayTag, "AXS15231B LCD initialized");
+  ESP_LOGI(kDisplayTag, "LCD initialized");
   return true;
 }
 
@@ -977,7 +977,7 @@ void DisplayManager::prepareForSleep() {
   }
 
   fillScreen(kTrueBlack);
-  axs15231bSleep();
+  PANEL_SLEEP();
   initialized_ = false;
   tickerPlaybackFrameActive_ = false;
   lastRenderKey_ = "";
@@ -989,7 +989,7 @@ bool DisplayManager::wakeFromSleep() {
     return false;
   }
 
-  axs15231bWake();
+  PANEL_WAKE();
   initialized_ = true;
   tickerPlaybackFrameActive_ = false;
   lastRenderKey_ = "";
@@ -1019,7 +1019,7 @@ bool DisplayManager::allocateBuffers() {
 }
 
 bool DisplayManager::initPanel() {
-  axs15231bInit();
+  PANEL_INIT();
   ESP_LOGI(kDisplayTag, "Panel init sequence complete");
   return true;
 }
@@ -1029,10 +1029,10 @@ bool DisplayManager::drawBitmap(int xStart, int yStart, int xEnd, int yEnd, cons
     return false;
   }
 
-  axs15231bPushColors(static_cast<uint16_t>(xStart), static_cast<uint16_t>(yStart),
-                      static_cast<uint16_t>(xEnd - xStart),
-                      static_cast<uint16_t>(yEnd - yStart),
-                      static_cast<const uint16_t *>(colorData));
+  PANEL_PUSH_COLORS(static_cast<uint16_t>(xStart), static_cast<uint16_t>(yStart),
+                    static_cast<uint16_t>(xEnd - xStart),
+                    static_cast<uint16_t>(yEnd - yStart),
+                    static_cast<const uint16_t *>(colorData));
   return true;
 }
 
@@ -1729,8 +1729,8 @@ void DisplayManager::drawMenuItem(const String &item, int y, bool selected) {
 }
 
 void DisplayManager::applyBrightness() {
-  axs15231bSetBrightnessPercent(brightnessPercent_);
-  axs15231bSetBacklight(true);
+  PANEL_SET_BRIGHTNESS_PERCENT(brightnessPercent_);
+  PANEL_SET_BACKLIGHT(true);
 }
 
 void DisplayManager::flushScaledFrame(int scale, int virtualWidth, int virtualHeight) {

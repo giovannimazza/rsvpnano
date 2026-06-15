@@ -1947,6 +1947,11 @@ bool StorageManager::begin() {
   listedOnce_ = false;
   clearBookCache();
 
+  if (!BoardConfig::HAS_SD_CARD) {
+    Serial.println("[storage] SD card not present on this board");
+    return false;
+  }
+
   if (!SD_MMC.setPins(BoardConfig::PIN_SD_CLK, BoardConfig::PIN_SD_CMD, BoardConfig::PIN_SD_D0)) {
     Serial.println("[storage] SD_MMC pin setup failed");
     return false;

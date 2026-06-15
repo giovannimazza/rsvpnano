@@ -11,6 +11,39 @@ enum class UiOrientation : uint8_t {
   PortraitFlipped,
 };
 
+// Current default board: Waveshare ESP32-S3 Touch LCD 3.49.
+// Alternate build target: waveshare_esp32s3_touch_amoled_143c.
+#if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
+constexpr int PIN_BOOT_BUTTON = 0;
+constexpr int PIN_PWR_BUTTON = 16;
+constexpr int PIN_BATTERY_ADC = 4;
+
+constexpr int PIN_LCD_CS = 14;
+constexpr int PIN_LCD_SCLK = 13;
+constexpr int PIN_LCD_DATA0 = 8;
+constexpr int PIN_LCD_DATA1 = 9;
+constexpr int PIN_LCD_DATA2 = 10;
+constexpr int PIN_LCD_DATA3 = 11;
+constexpr int PIN_LCD_RST = 12;
+constexpr int PIN_LCD_BACKLIGHT = -1;
+
+constexpr int PANEL_NATIVE_WIDTH = 466;
+constexpr int PANEL_NATIVE_HEIGHT = 466;
+constexpr int DISPLAY_WIDTH = 466;
+constexpr int DISPLAY_HEIGHT = 466;
+constexpr bool UI_ROTATED_180 = false;
+
+constexpr int PIN_SD_CLK = -1;
+constexpr int PIN_SD_CMD = -1;
+constexpr int PIN_SD_D0 = -1;
+constexpr bool HAS_SD_CARD = false;
+constexpr int PIN_I2C_SDA = 47;
+constexpr int PIN_I2C_SCL = 48;
+constexpr int PIN_TOUCH_SDA = 47;
+constexpr int PIN_TOUCH_SCL = 48;
+constexpr int PIN_TOUCH_RST = 15;
+constexpr int PIN_TOUCH_INT = 17;
+#else
 constexpr int PIN_BOOT_BUTTON = 0;
 constexpr int PIN_PWR_BUTTON = 16;
 constexpr int PIN_BATTERY_ADC = 4;
@@ -33,10 +66,14 @@ constexpr bool UI_ROTATED_180 = true;  // Keep BOOT/PWR at the top edge in lands
 constexpr int PIN_SD_CLK = 41;
 constexpr int PIN_SD_CMD = 39;
 constexpr int PIN_SD_D0 = 40;
+constexpr bool HAS_SD_CARD = true;
 constexpr int PIN_I2C_SDA = 47;
 constexpr int PIN_I2C_SCL = 48;
 constexpr int PIN_TOUCH_SDA = 17;
 constexpr int PIN_TOUCH_SCL = 18;
+constexpr int PIN_TOUCH_RST = -1;
+constexpr int PIN_TOUCH_INT = -1;
+#endif
 
 constexpr int TCA9554_ADDRESS = 0x20;
 constexpr uint8_t TCA9554_PIN_BATTERY_ADC_ENABLE = 1;
@@ -49,6 +86,7 @@ constexpr int PIN_AUDIO_WS = 46;
 constexpr int PIN_AUDIO_DIN = 6;
 constexpr int PIN_AUDIO_DOUT = 45;
 constexpr uint8_t ES8311_ADDRESS = 0x18;
+constexpr bool HAS_LCD_BACKLIGHT = PIN_LCD_BACKLIGHT >= 0;
 
 struct BatteryStatus {
   bool present = false;
