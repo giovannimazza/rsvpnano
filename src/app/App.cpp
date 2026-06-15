@@ -8,14 +8,10 @@
 #include <iterator>
 #include <utility>
 #include <vector>
-#include <SD_MMC.h>
 
 #include "app/MenuRepeat.h"
 #include "board/BoardConfig.h"
-#include "storage/fs/StoragePaths.h"
 #include "settings/PreferenceKeys.h"
-#include "text/RsvpDirectives.h"
-#include "text/RsvpTokenizer.h"
 
 #ifndef RSVP_USB_TRANSFER_ENABLED
 #define RSVP_USB_TRANSFER_ENABLED 0
@@ -103,68 +99,6 @@ constexpr uint8_t kNightBrightnessLevels[] = {35, 40, 45, 50, 55};
 constexpr size_t kBrightnessLevelCount = sizeof(kBrightnessLevels) / sizeof(kBrightnessLevels[0]);
 
 namespace {
-
-constexpr const char *kFallbackDemoBookPath = "/books/books/getting-started.rsvp";
-
-bool loadFallbackDemoWords(std::vector<String> &words) {
-  File file = SD_MMC.open(kFallbackDemoBookPath, FILE_READ);
-  if (!file || file.isDirectory()) {
-    if (file) {
-      file.close();
-    }
-    Serial.printf("[app] fallback demo book missing: %s\n", kFallbackDemoBookPath);
-    return false;
-  }
-
-  words.clear();
-  words.reserve(256);
-  size_t wordCount = 0;
-  while (file.available()) {
-    String line = file.readStringUntil('\n');
-    line.trim();
-    if (line.isEmpty()) {
-      continue;
-    }
-
-    if (line.startsWith("@")) {
-      if (!line.startsWith("@@")) {
-        continue;
-      }
-      line.remove(0, 1);
-    }
-
-    if (!RsvpText::appendLineWords(
-            line,
-            [&](const String &token) {
-              words.push_back(token);
-              ++wordCount;
-              return true;
-            },
-            wordCount, nullptr)) {
-      file.close();
-      return false;
-    }
-  }
-
-  file.close();
-  Serial.printf("[app] loaded fallback demo book: %s (%u words)\n", kFallbackDemoBookPath,
-                static_cast<unsigned int>(words.size()));
-  return !words.empty();
-}
-
-bool loadFallbackDemoBook(ReadingLoop &reader, String &title, uint32_t nowMs) {
-  std::vector<String> words;
-  if (!loadFallbackDemoWords(words)) {
-    return false;
-  }
-
-  title = RsvpText::readRsvpDirectiveValue(kFallbackDemoBookPath, "@title");
-  if (title.isEmpty()) {
-    title = StoragePaths::displayNameWithoutExtension(kFallbackDemoBookPath);
-  }
-  reader.setWords(std::move(words), nowMs);
-  return true;
-}
 
 bool touchPointInsideUsableFace(uint16_t x, uint16_t y, uint16_t insetPx = 0) {
   if (!kRoundDisplay) {
@@ -1000,13 +934,11 @@ void App::begin() {
     chapterMarkers_.clear();
     paragraphStarts_.clear();
     currentBookPath_ = "";
-    if (!loadFallbackDemoBook(reader_, currentBookTitle_, bootStartedMs_)) {
-      currentBookTitle_ = "Demo";
-      reader_.begin(bootStartedMs_);
-    }
+    currentBookTitle_ = "Demo";
+    reader_.begin(bootStartedMs_);
     invalidateContextPreviewWindow();
     rebuildTimeEstimateCache();
-    Serial.println("[app] using fallback book text");
+    Serial.println("[app] using built-in demo text");
   } else {
     currentBookTitle_ = storage_.bookDisplayName(pendingBootBookIndex_);
     if (currentBookTitle_.isEmpty()) {
@@ -5517,7 +5449,7 @@ void App::exitCompanionSync(uint32_t nowMs) {
 
 void App::runSdCardCheck(uint32_t nowMs) {
   (void)nowMs;
-  Serial.println("[app] running SD card check");
+  Serial.println("[app] running storage check");
   display_.renderStatus("SD check", "Starting", "");
   const StorageManager::DiagnosticResult result = storage_.diagnoseSdCard();
 
@@ -5655,10 +5587,8 @@ void App::exitUsbTransfer(uint32_t nowMs) {
         usingStorageBook_ = false;
         currentBookPath_ = "";
         reader_.clearLoadedBook(nowMs);
-        if (!loadFallbackDemoBook(reader_, currentBookTitle_, nowMs)) {
-          currentBookTitle_ = "Demo";
-          reader_.begin(nowMs);
-        }
+        currentBookTitle_ = "Demo";
+        reader_.begin(nowMs);
       }
     } else if (storage_.bookCount() > 0) {
       loadBookAtIndex(0, nowMs);
@@ -5994,10 +5924,8 @@ void App::wakeFromSleep(bool fullPeripheralReset) {
       usingStorageBook_ = false;
       currentBookPath_ = "";
       reader_.clearLoadedBook(nowMs);
-      if (!loadFallbackDemoBook(reader_, currentBookTitle_, nowMs)) {
-        currentBookTitle_ = "Demo";
-        reader_.begin(nowMs);
-      }
+      currentBookTitle_ = "Demo";
+      reader_.begin(nowMs);
     }
   }
 
@@ -6089,12 +6017,10 @@ void App::loadPendingBootBook(uint32_t nowMs) {
   chapterMarkers_.clear();
   paragraphStarts_.clear();
   currentBookPath_ = "";
-  if (!loadFallbackDemoBook(reader_, currentBookTitle_, millis())) {
-    currentBookTitle_ = "Demo";
-    reader_.begin(millis());
-  }
+  currentBookTitle_ = "Demo";
+  reader_.begin(millis());
   invalidateContextPreviewWindow();
-  Serial.println("[app] using fallback book text");
+  Serial.println("[app] using built-in demo text");
   renderActiveReader(millis());
 }
 
@@ -6206,7 +6132,7 @@ bool App::loadBookAtIndex(size_t index, uint32_t nowMs,
   }
 
   lastProgressSaveMs_ = nowMs;
-  Serial.printf("[app] loaded SD book[%u/%u]: %s (%u chapters, %u paragraphs)\n",
+  Serial.printf("[app] loaded storage book[%u/%u]: %s (%u chapters, %u paragraphs)\n",
                 static_cast<unsigned int>(loadedIndex + 1),
                 static_cast<unsigned int>(storage_.bookCount()), loadedPath.c_str(),
                 static_cast<unsigned int>(chapterMarkers_.size()),
@@ -7377,10 +7303,9 @@ void App::handleCurrentBookReadFailure(uint32_t nowMs, const char *detail) {
   chapterMarkers_.clear();
   paragraphStarts_.clear();
   currentBookPath_ = "";
-  if (!loadFallbackDemoBook(reader_, currentBookTitle_, nowMs)) {
-    currentBookTitle_ = "Demo";
-    reader_.begin(nowMs);
-  }
+  currentBookTitle_ = "Demo";
+  reader_.clearLoadedBook(nowMs);
+  reader_.begin(nowMs);
   usingStorageBook_ = false;
   contextViewVisible_ = false;
   wpmFeedbackVisible_ = false;

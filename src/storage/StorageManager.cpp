@@ -8,7 +8,6 @@
 #include "storage/fs/StorageFiles.h"
 #include "storage/fs/StoragePaths.h"
 #include "storage/index/IndexedBook.h"
-#include "storage/SeedBooks.h"
 
 #ifndef RSVP_ON_DEVICE_EPUB_CONVERSION
 #define RSVP_ON_DEVICE_EPUB_CONVERSION 0
@@ -39,20 +38,17 @@ bool StorageManager::begin() {
     listedOnce_ = false;
     clearBookCache();
 
-    statusCallback_(statusContext_, "Storage", "Initializing storage", "", 5);
+    statusCallback_(statusContext_, "SD", "Initializing storage", "", 5);
     int mountedFrequencyKhz = 0;
     if (SdDiagnostics::mountCard(mounted_, &mountedFrequencyKhz)) {
         const uint64_t sizeMb = SD_MMC.cardSize() / kBytesPerMegabyte;
-        Serial.printf("[storage] storage initialized (%llu MB, %d kHz)\n", sizeMb, mountedFrequencyKhz);
-        if (seedDemoBooksIfNeeded()) {
-            statusCallback_(statusContext_, "Storage", "Seeding books", "Built-in demo books", 15);
-        }
-        statusCallback_(statusContext_, "Storage", "Scanning books", "EPUB converts on open", 10);
+        Serial.printf("[storage] SD initialized (%llu MB, %d kHz)\n", sizeMb, mountedFrequencyKhz);
+        statusCallback_(statusContext_, "SD", "Scanning books", "EPUB converts on open", 10);
         refreshBookPaths(false);
         return true;
     }
 
-    Serial.println("[storage] storage init failed after retries");
+    Serial.println("[storage] SD init failed after retries");
     return false;
 }
 
@@ -181,7 +177,7 @@ void StorageManager::refreshBookPaths(bool includeMetadata) {
         return;
     }
 
-    statusCallback_(statusContext_, "SD", "Reading library", "", 96);
+    statusCallback_(statusContext_, "Storage", "Reading library", "", 96);
     BookLibrary::refresh(library_, includeMetadata, RSVP_ON_DEVICE_EPUB_CONVERSION);
 }
 
