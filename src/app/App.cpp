@@ -2033,6 +2033,17 @@ void App::applyPausedTouchGesture(const TouchEvent &event, uint32_t nowMs) {
   const bool tapLike = absDeltaX <= static_cast<int>(kTapSlopPx) &&
                        absDeltaY <= static_cast<int>(kTapSlopPx);
   const bool previewBrowseMode = contextViewVisible_ && !scrollModeEnabled();
+  bool wpmSwipeZoneAllowed = true;
+#if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
+  const int centerX = BoardConfig::DISPLAY_WIDTH / 2;
+  const int centerBandHalfWidth = BoardConfig::DISPLAY_WIDTH / 4;
+  const int minCenterY = BoardConfig::DISPLAY_HEIGHT / 4;
+  const int maxCenterY = (BoardConfig::DISPLAY_HEIGHT * 3) / 4;
+  wpmSwipeZoneAllowed =
+      abs(static_cast<int>(pausedTouch_.startX) - centerX) <= centerBandHalfWidth &&
+      static_cast<int>(pausedTouch_.startY) >= minCenterY &&
+      static_cast<int>(pausedTouch_.startY) <= maxCenterY;
+#endif
 
   if (state_ == AppState::Playing) {
     if (ended) {
@@ -2094,7 +2105,8 @@ void App::applyPausedTouchGesture(const TouchEvent &event, uint32_t nowMs) {
       resetReaderTapTracking();
       pausedTouchIntent_ = TouchIntent::BrowseScroll;
     } else if (!previewBrowseMode && absDeltaY >= static_cast<int>(kSwipeThresholdPx) &&
-               absDeltaY > absDeltaX + static_cast<int>(kAxisBiasPx)) {
+               absDeltaY > absDeltaX + static_cast<int>(kAxisBiasPx) &&
+               wpmSwipeZoneAllowed) {
       resetReaderTapTracking();
       pausedTouchIntent_ = TouchIntent::Wpm;
     }
