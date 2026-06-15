@@ -902,6 +902,8 @@ void DisplayManager::setBrightnessPercent(uint8_t percent) {
   }
 }
 
+void DisplayManager::invalidateRenderCache() { lastRenderKey_ = ""; }
+
 void DisplayManager::setDarkMode(bool darkMode) {
   if (darkMode_ == darkMode) {
     return;

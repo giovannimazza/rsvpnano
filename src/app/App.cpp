@@ -1662,6 +1662,8 @@ void App::openQuickSettings(uint32_t nowMs) {
   }
   menuScreen_ = MenuScreen::QuickSettings;
   setState(AppState::Menu, nowMs);
+  display_.invalidateRenderCache();
+  renderQuickSettings();
 }
 
 uint8_t App::currentBrightnessPercent() const {
@@ -3385,6 +3387,7 @@ void App::selectQuickSettingsItem(uint32_t nowMs) {
 void App::openQuickSync() {
   quickSyncSelectedIndex_ = QuickSyncWifi;
   menuScreen_ = MenuScreen::QuickSync;
+  display_.invalidateRenderCache();
   renderQuickSync();
 }
 
@@ -6708,6 +6711,10 @@ String App::currentBatteryLabel() const {
   if (!batteryPresent_ || !batterySampleInitialized_) {
     return "";
   }
+
+#if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
+  return batteryTimeRemainingLabel();
+#endif
 
   if (batteryLabelMode_ == BatteryLabelMode::TimeRemaining) {
     return batteryTimeRemainingLabel();

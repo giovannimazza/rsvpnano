@@ -64,6 +64,7 @@ class DisplayManager {
   void setBatteryLabel(const String &label);
   void setBrightnessOverlay(const String &text);
   void setBrightnessPercent(uint8_t percent);
+  void invalidateRenderCache();
   void setDarkMode(bool darkMode);
   void setNightMode(bool nightMode);
   void setYellowMode(bool enabled);
