@@ -37,7 +37,7 @@ if ($total_bytes -gt $usable_bytes) {
     Write-Host "       Remove or split some books in $data_dir\books\books\" -ForegroundColor Red
     exit 1
 } elseif ($pct -gt 80) {
-    Write-Host "   WARNING: space is above 80% — consider removing some books." -ForegroundColor Yellow
+    Write-Host "   WARNING: space is above 80% - consider removing some books." -ForegroundColor Yellow
 } else {
     Write-Host "   Space OK." -ForegroundColor Green
 }
