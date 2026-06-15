@@ -364,9 +364,10 @@ constexpr size_t kTypographyPreviewWordCount =
     sizeof(kTypographyPreviewWords) / sizeof(kTypographyPreviewWords[0]);
 constexpr size_t kWifiPasswordMaxLength = 63;
 constexpr uint16_t kKeyboardMarginX = 8;
-constexpr uint16_t kKeyboardTopY = Board::Config::DISPLAY_WIDTH == Board::Config::DISPLAY_HEIGHT ? 76 : 48;
-constexpr uint16_t kKeyboardRowGap = 4;
-constexpr uint16_t kKeyboardRowHeight = 27;
+constexpr bool kRoundKeyboardLayout = Board::Config::DISPLAY_WIDTH == Board::Config::DISPLAY_HEIGHT;
+constexpr uint16_t kKeyboardTopY = kRoundKeyboardLayout ? 102 : 48;
+constexpr uint16_t kKeyboardRowGap = kRoundKeyboardLayout ? 3 : 4;
+constexpr uint16_t kKeyboardRowHeight = kRoundKeyboardLayout ? 24 : 27;
 
 void logApp(const char *message) {
   ESP_LOGI(kAppTag, "%s", message);
