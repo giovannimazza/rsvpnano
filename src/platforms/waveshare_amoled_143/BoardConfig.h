@@ -114,10 +114,10 @@ constexpr uint8_t TCA9554_PIN_BATTERY_ADC_ENABLE = 0;
 constexpr uint8_t TCA9554_PIN_SYS_EN = 0;
 constexpr uint8_t TCA9554_PIN_AUDIO_ENABLE = 0;
 
-constexpr int PIN_AUDIO_MCLK = 7;
-constexpr int PIN_AUDIO_BCLK = 15;
-constexpr int PIN_AUDIO_WS = 46;
-constexpr int PIN_AUDIO_DIN = 6;
-constexpr int PIN_AUDIO_DOUT = 45;
+constexpr int PIN_AUDIO_MCLK = 38;
+constexpr int PIN_AUDIO_BCLK = 39;
+constexpr int PIN_AUDIO_WS = 40;
+constexpr int PIN_AUDIO_DIN = 41;
+constexpr int PIN_AUDIO_DOUT = 42;
 constexpr uint8_t ES8311_ADDRESS = 0x18;
 }  // namespace Board::Config

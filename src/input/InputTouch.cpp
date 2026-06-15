@@ -107,32 +107,33 @@ bool begin() {
     return false;
   }
 
+  const bool boardConfigured = Board::Touch::configure();
+  if (!boardConfigured) {
+    Serial.println("[touch] Board touch configuration did not find a controller");
+  }
+
   TwoWire &wire = Board::Touch::wire();
   wire.beginTransmission(Board::Config::TOUCH_I2C_ADDRESS);
   const uint8_t error = wire.endTransmission();
-  gTouch.initialized = (error == 0);
+  gTouch.initialized = (error == 0) || boardConfigured;
 
   if (!gTouch.initialized) {
     Serial.printf("[touch] Controller not detected at 0x%02X\n", Board::Config::TOUCH_I2C_ADDRESS);
     return false;
   }
 
-  Serial.printf("[touch] Initialized controller=0x%02X\n", Board::Config::TOUCH_I2C_ADDRESS);
+  Serial.printf("[touch] Initialized controller=0x%02X (%s)\n", Board::Config::TOUCH_I2C_ADDRESS,
+                error == 0 ? "direct" : "board-probed");
   if (Board::Config::TOUCH_RECOVERY_EVENT_IGNORE_MS > 0) {
     gTouch.ignoreEventsUntilMs = millis() + Board::Config::TOUCH_RECOVERY_EVENT_IGNORE_MS;
     Serial.printf("[touch] Ignoring events for %lu ms after init\n",
                   static_cast<unsigned long>(Board::Config::TOUCH_RECOVERY_EVENT_IGNORE_MS));
   }
 
-  if (Board::Config::TOUCH_REQUIRES_MONITOR_MODE) {
-    const bool configured = Board::Touch::configure();
-    if (configured) {
-      Serial.printf("[touch] Applied monitor mode reg=0x%02X value=0x%02X\n",
-                    Board::Config::TOUCH_MONITOR_MODE_REGISTER,
-                    Board::Config::TOUCH_MONITOR_MODE_VALUE);
-    } else {
-      Serial.println("[touch] Failed to apply board-specific monitor mode");
-    }
+  if (Board::Config::TOUCH_REQUIRES_MONITOR_MODE && boardConfigured) {
+    Serial.printf("[touch] Applied monitor mode reg=0x%02X value=0x%02X\n",
+                  Board::Config::TOUCH_MONITOR_MODE_REGISTER,
+                  Board::Config::TOUCH_MONITOR_MODE_VALUE);
   }
 
   return true;
