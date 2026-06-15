@@ -44,12 +44,11 @@ bool StorageManager::begin() {
     if (SdDiagnostics::mountCard(mounted_, &mountedFrequencyKhz)) {
         const uint64_t sizeMb = SD_MMC.cardSize() / kBytesPerMegabyte;
         Serial.printf("[storage] SD initialized (%llu MB, %d kHz)\n", sizeMb, mountedFrequencyKhz);
+        if (seedDemoBooksIfNeeded()) {
+            statusCallback_(statusContext_, "SD", "Seeding books", "Built-in demo books", 15);
+        }
         statusCallback_(statusContext_, "SD", "Scanning books", "EPUB converts on open", 10);
         refreshBookPaths(false);
-        if (library_.paths.empty() && seedDemoBooksIfNeeded()) {
-            statusCallback_(statusContext_, "SD", "Seeding books", "Built-in demo books", 15);
-            refreshBookPaths(false);
-        }
         return true;
     }
 
