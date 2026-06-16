@@ -55,6 +55,7 @@ constexpr int kReaderChromeMarginTop = Board::Config::READER_CHROME_MARGIN_TOP;
 constexpr int kReaderChromeMarginBottom = Board::Config::READER_CHROME_MARGIN_BOTTOM;
 constexpr int kReaderBatteryMarginX = Board::Config::READER_BATTERY_MARGIN_X;
 constexpr int kReaderBatteryMarginTop = Board::Config::READER_BATTERY_MARGIN_TOP;
+constexpr bool kReaderBatteryCentered = Board::Config::READER_BATTERY_CENTERED;
 constexpr int kEdgeMenuHintMaxWidth = 34;
 constexpr int kEdgeMenuHintMinWidth = 22;
 constexpr int kEdgeMenuHintHeight = 3;
@@ -1657,8 +1658,13 @@ void DisplayManager::drawBatteryBadge(int logicalWidth, int logicalHeight) {
   }
 
   const int width = measureTinyTextWidth(batteryLabel_, kTinyScale);
-  const int x = (logicalWidth - width) / 2;
-  const int y = kReaderBatteryMarginTop;
+  const int x = kReaderBatteryCentered
+                    ? (logicalWidth - width) / 2
+                    : std::max(kReaderBatteryMarginX, logicalWidth - kReaderBatteryMarginX - width);
+  const int y = kReaderBatteryCentered
+                    ? kReaderBatteryMarginTop
+                    : (logicalHeight > (kDisplayHeight * 2) ? kReaderBatteryMarginTop + 8
+                                                            : kReaderBatteryMarginTop);
   drawTinyTextAt(batteryLabel_, x, y, footerColor(), kTinyScale);
 }
 

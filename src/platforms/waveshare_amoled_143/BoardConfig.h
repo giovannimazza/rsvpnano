@@ -56,6 +56,7 @@ constexpr int READER_CHROME_MARGIN_TOP = 24;
 constexpr int READER_CHROME_MARGIN_BOTTOM = 24;
 constexpr int READER_BATTERY_MARGIN_X = 64;
 constexpr int READER_BATTERY_MARGIN_TOP = 32;
+constexpr bool READER_BATTERY_CENTERED = true;
 constexpr int PIN_DEEP_SLEEP_WAKE = PIN_PWR_BUTTON;
 constexpr bool SUPPORTS_SOFTWARE_POWEROFF = true;
 constexpr bool RELEASE_BATTERY_HOLD_BEFORE_DEEP_SLEEP = false;
