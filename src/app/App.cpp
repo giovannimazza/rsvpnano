@@ -1046,7 +1046,9 @@ void App::update(uint32_t nowMs) {
 
   if (batteryChanged && (state_ == AppState::Paused || state_ == AppState::Playing)) {
     renderActiveReader(nowMs);
-  } else if (batteryChanged && state_ == AppState::Menu) {
+  } else if (state_ == AppState::Menu &&
+             (batteryChanged || (menuScreen_ == MenuScreen::QuickSettings &&
+                                 didBatterySampleJustRun(nowMs)))) {
     renderMenu();
   }
 
@@ -2094,6 +2096,11 @@ bool App::updateBatteryStatus(uint32_t nowMs, bool force) {
     Serial.println("[power] battery not detected");
   }
   return true;
+}
+
+bool App::didBatterySampleJustRun(uint32_t nowMs) const {
+  // True for one update tick right after a battery sample was taken.
+  return nowMs - lastBatterySampleMs_ < 500;
 }
 
 void App::handleBatteryProtection(uint32_t nowMs) {

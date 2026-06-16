@@ -221,6 +221,7 @@ class App {
   void applyTypographySettings(uint32_t nowMs, bool rerender = true);
   uint8_t currentBrightnessPercent() const;
   bool updateBatteryStatus(uint32_t nowMs, bool force = false);
+  bool didBatterySampleJustRun(uint32_t nowMs) const;
   void handleBatteryProtection(uint32_t nowMs);
   void showLowBatteryWarning(uint32_t nowMs);
   void updateBatteryWarningOverlay(uint32_t nowMs);
