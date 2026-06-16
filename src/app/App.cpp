@@ -1,6 +1,11 @@
 #include "app/App.h"
 
+#ifndef RSVP_NO_WIFI
 #include <WiFi.h>
+#include "rss/RssFeedManager.h"
+#include "sync/CompanionSyncManager.h"
+#include "update/OtaUpdater.h"
+#endif
 #include <algorithm>
 #include <climits>
 #include <cstdio>
@@ -55,6 +60,9 @@ constexpr uint16_t kMenuSwipeTopZonePx =
 constexpr uint16_t kQuickSettingsSwipeBottomZonePx =
     kReaderChromeBottomMarginPx + (Board::Config::ENABLE_BOTTOM_EDGE_QUICK_SETTINGS_SWIPE ? 64 : 0);
 constexpr uint16_t kMenuSwipeTriggerPx = 72;
+constexpr bool kRoundDisplay = Board::Config::DISPLAY_WIDTH == Board::Config::DISPLAY_HEIGHT;
+constexpr uint16_t kRoundSwipeZoneExtraPx = 60;
+constexpr uint16_t kRoundSwipeFaceInsetPx = 10;
 constexpr uint16_t kScrubStepPx = 22;
 constexpr uint16_t kBrowseNeutralZonePx = 14;
 constexpr uint16_t kFocusTimerCancelHoldMaxDriftPx = 20;
@@ -97,6 +105,40 @@ constexpr size_t kBrightnessLevelCount = sizeof(kBrightnessLevels) / sizeof(kBri
 
 namespace {
 
+bool touchPointInsideUsableFace(uint16_t x, uint16_t y, uint16_t insetPx = 0) {
+  if (!kRoundDisplay) {
+    return true;
+  }
+
+  const int centerX = Board::Config::DISPLAY_WIDTH / 2;
+  const int centerY = Board::Config::DISPLAY_HEIGHT / 2;
+  const int baseRadius = std::min(Board::Config::DISPLAY_WIDTH, Board::Config::DISPLAY_HEIGHT) / 2;
+  const int radius = std::max(1, baseRadius - static_cast<int>(insetPx));
+  const int dx = static_cast<int>(x) - centerX;
+  const int dy = static_cast<int>(y) - centerY;
+  return (dx * dx) + (dy * dy) <= (radius * radius);
+}
+
+bool isTopEdgeSwipeStart(uint16_t startX, uint16_t startY) {
+  if (!touchPointInsideUsableFace(startX, startY, kRoundSwipeFaceInsetPx)) {
+    return false;
+  }
+
+  const uint16_t topZone = static_cast<uint16_t>(
+      kMenuSwipeTopZonePx + (kRoundDisplay ? kRoundSwipeZoneExtraPx : 0));
+  return startY <= topZone;
+}
+
+bool isBottomEdgeSwipeStart(uint16_t startX, uint16_t startY) {
+  if (!touchPointInsideUsableFace(startX, startY, kRoundSwipeFaceInsetPx)) {
+    return false;
+  }
+
+  const uint16_t bottomZone = static_cast<uint16_t>(
+      kQuickSettingsSwipeBottomZonePx + (kRoundDisplay ? kRoundSwipeZoneExtraPx : 0));
+  return startY >= static_cast<uint16_t>(Board::Config::DISPLAY_HEIGHT - bottomZone);
+}
+
 enum MenuItem : size_t {
   MenuResume,
   MenuChapters,
@@ -105,10 +147,9 @@ enum MenuItem : size_t {
   MenuFocusTimer,
   MenuSettings,
   MenuSdCardCheck,
+#ifndef RSVP_NO_WIFI
   MenuRssFeeds,
   MenuCompanionSync,
-#if RSVP_USB_TRANSFER_ENABLED
-  MenuUsbTransfer,
 #endif
   MenuPowerOff,
   MenuItemCount,
@@ -127,7 +168,9 @@ enum RestructuredMenuItem : size_t {
 enum ArticlesItem : size_t {
   ArticlesBack,
   ArticlesBrowse,
+#ifndef RSVP_NO_WIFI
   ArticlesUpdateRss,
+#endif
   ArticlesItemCount,
 };
 
@@ -190,13 +233,14 @@ enum QuickSettingsItem : size_t {
   QuickSettingsBrightness,
   QuickSettingsTheme,
   QuickSettingsFocusTimer,
+#ifndef RSVP_NO_WIFI
   QuickSettingsSync,
+#endif
   QuickSettingsItemCount,
 };
 
 enum QuickSyncItem : size_t {
   QuickSyncWifi,
-  QuickSyncUsb,
   QuickSyncItemCount,
 };
 
@@ -208,18 +252,29 @@ constexpr size_t kSettingsBackIndex = 0;
 constexpr size_t kSettingsHomePacingIndex = 1;
 constexpr size_t kSettingsHomeDisplayIndex = 2;
 constexpr size_t kSettingsHomeTypographyIndex = 3;
+#ifndef RSVP_NO_WIFI
 constexpr size_t kSettingsHomeWifiIndex = 4;
 constexpr size_t kSettingsHomeBatteryIndex = 5;
 constexpr size_t kSettingsHomeUpdateIndex = 6;
 constexpr size_t kSettingsHomeFirmwareVersionIndex = 7;
+#else
+constexpr size_t kSettingsHomeBatteryIndex = 4;
+constexpr size_t kSettingsHomeFirmwareVersionIndex = 5;
+#endif
 constexpr size_t kSettingsHomeRestructuredDisplayIndex = 1;
 constexpr size_t kSettingsHomeRestructuredPacingIndex = 2;
 constexpr size_t kSettingsHomeRestructuredTypographyIndex = 3;
+#ifndef RSVP_NO_WIFI
 constexpr size_t kSettingsHomeRestructuredWifiIndex = 4;
 constexpr size_t kSettingsHomeRestructuredBatteryIndex = 5;
 constexpr size_t kSettingsHomeRestructuredUpdateIndex = 6;
 constexpr size_t kSettingsHomeRestructuredFirmwareVersionIndex = 7;
 constexpr size_t kSettingsHomeRestructuredSdCardIndex = 8;
+#else
+constexpr size_t kSettingsHomeRestructuredBatteryIndex = 4;
+constexpr size_t kSettingsHomeRestructuredFirmwareVersionIndex = 5;
+constexpr size_t kSettingsHomeRestructuredSdCardIndex = 6;
+#endif
 constexpr size_t kSettingsDisplayThemeIndex = 1;
 constexpr size_t kSettingsDisplayBrightnessIndex = 2;
 constexpr size_t kSettingsDisplayHandednessIndex = 3;
@@ -325,9 +380,10 @@ constexpr size_t kTypographyPreviewWordCount =
     sizeof(kTypographyPreviewWords) / sizeof(kTypographyPreviewWords[0]);
 constexpr size_t kWifiPasswordMaxLength = 63;
 constexpr uint16_t kKeyboardMarginX = 8;
-constexpr uint16_t kKeyboardTopY = 48;
-constexpr uint16_t kKeyboardRowGap = 4;
-constexpr uint16_t kKeyboardRowHeight = 27;
+constexpr bool kRoundKeyboardLayout = Board::Config::DISPLAY_WIDTH == Board::Config::DISPLAY_HEIGHT;
+constexpr uint16_t kKeyboardTopY = kRoundKeyboardLayout ? 182 : 48;
+constexpr uint16_t kKeyboardRowGap = kRoundKeyboardLayout ? 3 : 4;
+constexpr uint16_t kKeyboardRowHeight = kRoundKeyboardLayout ? 22 : 27;
 
 void logApp(const char *message) {
   ESP_LOGI(kAppTag, "%s", message);
@@ -414,6 +470,7 @@ DisplayManager::TypographyConfig defaultTypographyConfig() {
   return DisplayManager::TypographyConfig();
 }
 
+#ifndef RSVP_NO_WIFI
 bool wifiNetworkRequiresPassword(uint8_t authMode) {
   return static_cast<wifi_auth_mode_t>(authMode) != WIFI_AUTH_OPEN;
 }
@@ -421,6 +478,7 @@ bool wifiNetworkRequiresPassword(uint8_t authMode) {
 String wifiSecurityLabel(uint8_t authMode) {
   return wifiNetworkRequiresPassword(authMode) ? "Secure" : "Open";
 }
+#endif
 
 String maskedValue(const String &value) {
   String masked;
@@ -466,6 +524,7 @@ String storedOrFallbackLabel(const String &value, const String &fallback) {
   return value.isEmpty() ? fallback : value;
 }
 
+#ifndef RSVP_NO_WIFI
 void copyOtaLabel(char *destination, size_t destinationSize, const String &source) {
   if (destination == nullptr || destinationSize == 0) {
     return;
@@ -477,6 +536,7 @@ void copyOtaLabel(char *destination, size_t destinationSize, const String &sourc
   }
   destination[copyLength] = '\0';
 }
+#endif
 
 bool sdCardFolderRepairNeeded(const StorageManager::DiagnosticResult &result) {
   return result.mounted &&
@@ -864,7 +924,7 @@ void App::begin() {
   lastActivityMs_ = bootStartedMs_;
   lastStateLogMs_ = bootStartedMs_;
   lastScrollAnimationRenderMs_ = 0;
-  Serial.printf("[app] version=%s\n", otaUpdater_.currentVersion().c_str());
+  Serial.printf("[app] version=%s\n", firmwareVersionLabel().c_str());
 
   logApp("Initializing hardware modules");
   const bool displayReady = display_.begin();
@@ -1105,7 +1165,11 @@ void App::setState(AppState nextState, uint32_t nowMs) {
       renderMenu();
       break;
     case AppState::CompanionSync:
+#ifndef RSVP_NO_WIFI
       display_.renderStatus("Sync", companionSync_.statusLine1(), companionSync_.statusLine2());
+#else
+      display_.renderStatus("Sync", "Unavailable", "");
+#endif
       break;
     case AppState::UsbTransfer:
       display_.renderStatus("USB", "Preparing SD", "Eject when done");
@@ -1290,8 +1354,10 @@ void App::executeBootButtonSingleTap(uint32_t nowMs) {
         settingsSelectedIndex_ = kSettingsHomeRestructuredPacingIndex;
       } else if (menuScreen_ == MenuScreen::SettingsBattery) {
         settingsSelectedIndex_ = kSettingsHomeRestructuredBatteryIndex;
+#ifndef RSVP_NO_WIFI
       } else if (menuScreen_ == MenuScreen::WifiSettings) {
         settingsSelectedIndex_ = kSettingsHomeRestructuredWifiIndex;
+#endif
       } else {
         settingsSelectedIndex_ = kSettingsHomeRestructuredTypographyIndex;
       }
@@ -1623,6 +1689,8 @@ void App::openQuickSettings(uint32_t nowMs) {
   }
   menuScreen_ = MenuScreen::QuickSettings;
   setState(AppState::Menu, nowMs);
+  display_.invalidateRenderCache();
+  renderQuickSettings();
 }
 
 uint8_t App::currentBrightnessPercent() const {
@@ -2193,18 +2261,25 @@ void App::updateBatteryRuntimeLabel(uint32_t nowMs) {
 }
 
 bool App::isFooterMetricTap(uint16_t x, uint16_t y) const {
-  return x >= Board::Config::DISPLAY_WIDTH - kReaderChromeMarginXPx - kFooterMetricTapWidthPx &&
-         y >= Board::Config::DISPLAY_HEIGHT - kReaderChromeBottomMarginPx - kFooterMetricTapHeightPx;
+  return false;
 }
 
 bool App::isBatteryBadgeTap(uint16_t x, uint16_t y) const {
-  return x >= Board::Config::DISPLAY_WIDTH - kReaderBatteryMarginXPx - kBatteryBadgeTapWidthPx &&
-         y <= kReaderBatteryTopMarginPx + kBatteryBadgeTapHeightPx;
+  return false;
 }
 
 bool App::isPreviousSentenceTap(uint16_t x, uint16_t y) const {
   return x <= kReaderChromeMarginXPx + kPreviousSentenceTapWidthPx &&
          y <= kReaderChromeTopMarginPx + kPreviousSentenceTapHeightPx;
+}
+
+bool App::isWpmSwipeTap(uint16_t y) const {
+  const uint16_t topBound =
+      kReaderChromeTopMarginPx + (Board::Config::ENABLE_TOP_EDGE_MENU_SWIPE ? 64 : 0);
+  const uint16_t bottomBound =
+      Board::Config::DISPLAY_HEIGHT - kReaderChromeBottomMarginPx -
+      (Board::Config::ENABLE_BOTTOM_EDGE_QUICK_SETTINGS_SWIPE ? 64 : 0);
+  return y >= topBound && y <= bottomBound;
 }
 
 bool App::isActivelyReading() const { return state_ == AppState::Playing; }
@@ -2215,6 +2290,9 @@ DisplayManager::ReaderChrome App::readerChrome() const {
   chrome.showBattery = !reading || readerBatteryVisibleWhilePlaying_;
   chrome.showChapter = chapterLabelEnabled_ && (!reading || readerChapterVisibleWhilePlaying_);
   chrome.showProgress = !reading || readerProgressVisibleWhilePlaying_;
+#if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
+  chrome.showProgress = reading;
+#endif
   chrome.showPreviousSentenceHint = !contextViewVisible_ || scrollModeEnabled();
   chrome.showEdgeMenuHints = !reading;
   return chrome;
@@ -2488,7 +2566,8 @@ void App::applyPausedTouchGesture(const TouchEvent &event, uint32_t nowMs) {
                absDeltaY > absDeltaX + static_cast<int>(kAxisBiasPx)) {
       pausedTouchIntent_ = TouchIntent::BrowseScroll;
     } else if (!previewBrowseMode && absDeltaY >= static_cast<int>(kSwipeThresholdPx) &&
-               absDeltaY > absDeltaX + static_cast<int>(kAxisBiasPx)) {
+               absDeltaY > absDeltaX + static_cast<int>(kAxisBiasPx) &&
+               isWpmSwipeTap(pausedTouch_.startY)) {
       pausedTouchIntent_ = TouchIntent::Wpm;
     }
   }
@@ -2557,7 +2636,7 @@ bool App::handleTopEdgeMenuSwipe(const TouchEvent &event, uint32_t nowMs, int de
 
   const int absDeltaX = abs(deltaX);
   const int absDeltaY = abs(deltaY);
-  const bool startsNearTop = pausedTouch_.startY <= kMenuSwipeTopZonePx;
+  const bool startsNearTop = isTopEdgeSwipeStart(pausedTouch_.startX, pausedTouch_.startY);
   const bool verticalDownSwipe =
       deltaY >= static_cast<int>(kMenuSwipeTriggerPx) &&
       absDeltaY > absDeltaX + static_cast<int>(kAxisBiasPx);
@@ -2575,15 +2654,13 @@ bool App::handleTopEdgeMenuSwipe(const TouchEvent &event, uint32_t nowMs, int de
 bool App::handleBottomEdgeQuickSettingsSwipe(const TouchEvent &event, uint32_t nowMs, int deltaX,
                                              int deltaY, bool ended) {
   if (!Board::Config::ENABLE_BOTTOM_EDGE_QUICK_SETTINGS_SWIPE || !ended ||
-      state_ == AppState::Menu || state_ == AppState::Standby || state_ == AppState::Sleeping) {
+      state_ == AppState::Standby || state_ == AppState::Sleeping) {
     return false;
   }
 
   const int absDeltaX = abs(deltaX);
   const int absDeltaY = abs(deltaY);
-  const bool startsNearBottom =
-      pausedTouch_.startY >=
-      static_cast<uint16_t>(Board::Config::DISPLAY_HEIGHT - kQuickSettingsSwipeBottomZonePx);
+  const bool startsNearBottom = isBottomEdgeSwipeStart(pausedTouch_.startX, pausedTouch_.startY);
   const bool verticalUpSwipe =
       deltaY <= -static_cast<int>(kMenuSwipeTriggerPx) &&
       absDeltaY > absDeltaX + static_cast<int>(kAxisBiasPx);
@@ -2593,9 +2670,16 @@ bool App::handleBottomEdgeQuickSettingsSwipe(const TouchEvent &event, uint32_t n
 
   pausedTouch_.active = false;
   pausedTouchIntent_ = TouchIntent::None;
-  openQuickSettings(nowMs);
-  Serial.printf("[touch] bottom-edge quick settings swipe x=%u y=%u dy=%d\n", event.x,
-                event.y, deltaY);
+
+  if (state_ == AppState::Menu || state_ == AppState::CompanionSync || 
+      state_ == AppState::UsbTransfer) {
+    setState(AppState::Paused, nowMs);
+    Serial.printf("[touch] bottom-edge back swipe x=%u y=%u dy=%d (returning to reader)\n", 
+                  event.x, event.y, deltaY);
+  } else {
+    openQuickSettings(nowMs);
+    Serial.printf("[touch] bottom-edge quick settings swipe x=%u y=%u dy=%d\n", event.x, event.y, deltaY);
+  }
   return true;
 }
 
@@ -3020,9 +3104,11 @@ bool App::moveMenuSelection(int direction, bool wrap) {
       case ArticlesBrowse:
         selectedLabel = "Browse articles";
         break;
+#ifndef RSVP_NO_WIFI
       case ArticlesUpdateRss:
         selectedLabel = "Update RSS";
         break;
+#endif
       default:
         break;
     }
@@ -3074,15 +3160,17 @@ bool App::moveMenuSelection(int direction, bool wrap) {
       case QuickSettingsFocusTimer:
         selectedLabel = "Focus Timer";
         break;
+#ifndef RSVP_NO_WIFI
       case QuickSettingsSync:
-      default:
         selectedLabel = "Sync";
+        break;
+#endif
+      default:
         break;
     }
     Serial.printf("[quick] selected=%s\n", selectedLabel.c_str());
   } else if (menuScreen_ == MenuScreen::QuickSync) {
-    const String selectedLabel =
-        quickSyncSelectedIndex_ == QuickSyncWifi ? "Wi-Fi Sync" : "USB Sync";
+    const String selectedLabel = "Wi-Fi Sync";
     Serial.printf("[quick] sync selected=%s\n", selectedLabel.c_str());
   } else if (menuScreen_ == MenuScreen::FocusTimerGenres) {
     Serial.printf("[timer] selected genre=%s\n",
@@ -3135,15 +3223,12 @@ bool App::moveMenuSelection(int direction, bool wrap) {
         case MenuSdCardCheck:
           selectedLabel = "SD card check";
           break;
+#ifndef RSVP_NO_WIFI
         case MenuRssFeeds:
           selectedLabel = "RSS feeds";
           break;
         case MenuCompanionSync:
           selectedLabel = "Companion sync";
-          break;
-#if RSVP_USB_TRANSFER_ENABLED
-        case MenuUsbTransfer:
-          selectedLabel = uiText(UiText::UsbTransfer);
           break;
 #endif
         case MenuPowerOff:
@@ -3248,18 +3333,12 @@ void App::selectMenuItem(uint32_t nowMs) {
     case MenuPowerOff:
       enterPowerOff(nowMs);
       return;
-    case MenuCompanionSync:
-      enterCompanionSync(nowMs);
-      return;
     case MenuSdCardCheck:
       runSdCardCheck(nowMs);
       return;
+#ifndef RSVP_NO_WIFI
     case MenuRssFeeds:
       runRssFeedCheck(nowMs);
-      return;
-#if RSVP_USB_TRANSFER_ENABLED
-    case MenuUsbTransfer:
-      enterUsbTransfer(nowMs);
       return;
 #endif
     case MenuChapters:
@@ -3277,6 +3356,11 @@ void App::selectMenuItem(uint32_t nowMs) {
     case MenuSettings:
       openSettings();
       return;
+#ifndef RSVP_NO_WIFI
+    case MenuCompanionSync:
+      enterCompanionSync(nowMs);
+      return;
+#endif
     default:
       return;
   }
@@ -3297,9 +3381,11 @@ void App::selectArticlesItem(uint32_t nowMs) {
     case ArticlesBrowse:
       openBookPicker(true);
       return;
+#ifndef RSVP_NO_WIFI
     case ArticlesUpdateRss:
       runRssFeedCheck(nowMs);
       return;
+#endif
     default:
       return;
   }
@@ -3316,9 +3402,11 @@ void App::selectQuickSettingsItem(uint32_t nowMs) {
     case QuickSettingsFocusTimer:
       openFocusTimer();
       return;
+#ifndef RSVP_NO_WIFI
     case QuickSettingsSync:
       openQuickSync();
       return;
+#endif
     default:
       return;
   }
@@ -3327,6 +3415,7 @@ void App::selectQuickSettingsItem(uint32_t nowMs) {
 void App::openQuickSync() {
   quickSyncSelectedIndex_ = QuickSyncWifi;
   menuScreen_ = MenuScreen::QuickSync;
+  display_.invalidateRenderCache();
   renderQuickSync();
 }
 
@@ -3334,9 +3423,6 @@ void App::selectQuickSyncItem(uint32_t nowMs) {
   switch (quickSyncSelectedIndex_) {
     case QuickSyncWifi:
       enterCompanionSync(nowMs);
-      return;
-    case QuickSyncUsb:
-      enterUsbTransfer(nowMs);
       return;
     default:
       return;
@@ -3390,16 +3476,20 @@ void App::selectSettingsItem(uint32_t nowMs) {
         rebuildSettingsMenuItems();
         renderSettings();
         return;
+#ifndef RSVP_NO_WIFI
       case kSettingsHomeWifiIndex:
         openWifiSettings();
         return;
+#endif
       case kSettingsHomeBatteryIndex:
         openBatterySettings();
         return;
+#ifndef RSVP_NO_WIFI
       case kSettingsHomeUpdateIndex: {
         runFirmwareUpdate(preferredOtaConfig(), false, nowMs);
         return;
       }
+#endif
       default:
         return;
     }
@@ -3622,15 +3712,19 @@ void App::selectRestructuredSettingsItem(uint32_t nowMs) {
       case kSettingsHomeRestructuredTypographyIndex:
         openTypographyTuning();
         return;
+#ifndef RSVP_NO_WIFI
       case kSettingsHomeRestructuredWifiIndex:
         openWifiSettings();
         return;
+#endif
       case kSettingsHomeRestructuredBatteryIndex:
         openBatterySettings();
         return;
+#ifndef RSVP_NO_WIFI
       case kSettingsHomeRestructuredUpdateIndex:
         runFirmwareUpdate(preferredOtaConfig(), false, nowMs);
         return;
+#endif
       case kSettingsHomeRestructuredFirmwareVersionIndex:
         return;
       case kSettingsHomeRestructuredSdCardIndex:
@@ -3824,6 +3918,7 @@ void App::selectRestructuredSettingsItem(uint32_t nowMs) {
   }
 
   if (menuScreen_ == MenuScreen::WifiSettings) {
+#ifndef RSVP_NO_WIFI
     switch (settingsSelectedIndex_) {
       case kSettingsBackIndex:
         settingsSelectedIndex_ = kSettingsHomeRestructuredWifiIndex;
@@ -3847,6 +3942,10 @@ void App::selectRestructuredSettingsItem(uint32_t nowMs) {
       default:
         return;
     }
+#else
+    openSettings();
+    return;
+#endif
   }
 
   if (menuScreen_ == MenuScreen::WifiNetworkSettings) {
@@ -3993,6 +4092,14 @@ void App::selectBatterySettingsItem(uint32_t nowMs) {
 }
 
 void App::openWifiSettings() {
+#ifdef RSVP_NO_WIFI
+  settingsSelectedIndex_ = Board::Config::ENABLE_RESTRUCTURED_MENU
+                               ? kSettingsHomeRestructuredBatteryIndex
+                               : kSettingsHomeBatteryIndex;
+  menuScreen_ = MenuScreen::SettingsHome;
+  rebuildSettingsMenuItems();
+  renderSettings();
+#else
   if (Board::Config::ENABLE_RESTRUCTURED_MENU) {
     settingsSelectedIndex_ = configuredWifiSsid().isEmpty()
                                  ? kWifiSettingsRestructuredNetworkIndex
@@ -4004,16 +4111,25 @@ void App::openWifiSettings() {
   menuScreen_ = MenuScreen::WifiSettings;
   rebuildSettingsMenuItems();
   renderSettings();
+#endif
 }
 
 void App::openWifiNetworkSettings() {
+#ifdef RSVP_NO_WIFI
+  openWifiSettings();
+#else
   settingsSelectedIndex_ = kWifiNetworkSettingsChooseIndex;
   menuScreen_ = MenuScreen::WifiNetworkSettings;
   rebuildSettingsMenuItems();
   renderSettings();
+#endif
 }
 
 void App::selectWifiSettingsItem(uint32_t nowMs) {
+#ifdef RSVP_NO_WIFI
+  (void)nowMs;
+  openWifiSettings();
+#else
   (void)nowMs;
 
   switch (settingsSelectedIndex_) {
@@ -4048,9 +4164,13 @@ void App::selectWifiSettingsItem(uint32_t nowMs) {
     default:
       return;
   }
+#endif
 }
 
 void App::scanWifiNetworks() {
+#ifdef RSVP_NO_WIFI
+  display_.renderStatus("Wi-Fi", "Disabled", "");
+#else
   if (blockNetworkActionForOtaCheck("Wi-Fi", millis())) {
     return;
   }
@@ -4117,18 +4237,27 @@ void App::scanWifiNetworks() {
       wifiNetworkMenuItems_.size() > 1 ? kWifiNetworksFirstItemIndex : kWifiNetworksBackIndex;
   menuScreen_ = MenuScreen::WifiNetworks;
   renderWifiNetworks();
+#endif
 }
 
 void App::renderWifiNetworks() {
+#ifdef RSVP_NO_WIFI
+  display_.renderStatus("Wi-Fi", "Disabled", "");
+#else
   if (wifiNetworkMenuItems_.empty()) {
     display_.renderStatus("Wi-Fi", "No networks found", "");
     return;
   }
 
   display_.renderLibrary(wifiNetworkMenuItems_, wifiNetworkSelectedIndex_);
+#endif
 }
 
 void App::selectWifiNetworkItem(uint32_t nowMs) {
+#ifdef RSVP_NO_WIFI
+  (void)nowMs;
+  openWifiSettings();
+#else
   (void)nowMs;
 
   if (wifiNetworkSelectedIndex_ == kWifiNetworksBackIndex || wifiNetworkMenuItems_.size() <= 1) {
@@ -4159,6 +4288,7 @@ void App::selectWifiNetworkItem(uint32_t nowMs) {
   display_.renderStatus("Wi-Fi", "Network saved", network.ssid);
   delay(900);
   openWifiSettings();
+#endif
 }
 
 void App::openTextEntry(TextEntryPurpose purpose, const String &title, const String &prompt,
@@ -4396,6 +4526,7 @@ void App::commitTextEntry(uint32_t nowMs) {
       openWifiSettings();
       return;
     }
+ #ifndef RSVP_NO_WIFI
     case TextEntryPurpose::OtaOwner: {
       const String owner = textEntrySession_.value;
       if (owner.isEmpty()) {
@@ -4411,6 +4542,7 @@ void App::commitTextEntry(uint32_t nowMs) {
       openWifiSettings();
       return;
     }
+ #endif
     case TextEntryPurpose::None:
     default:
       menuScreen_ = textEntrySession_.returnScreen;
@@ -4526,9 +4658,13 @@ void App::rebuildSettingsMenuItems() {
       settingsMenuItems_.push_back(uiText(UiText::Display));
       settingsMenuItems_.push_back(uiText(UiText::WordPacing));
       settingsMenuItems_.push_back(uiText(UiText::TypographyTune));
+#ifndef RSVP_NO_WIFI
       settingsMenuItems_.push_back("Wi-Fi");
+#endif
       settingsMenuItems_.push_back("Battery");
+#ifndef RSVP_NO_WIFI
       settingsMenuItems_.push_back(firmwareUpdateMenuLabel());
+#endif
       settingsMenuItems_.push_back("Installed: " + firmwareVersionLabel());
       settingsMenuItems_.push_back("SD card check");
     } else if (menuScreen_ == MenuScreen::SettingsDisplay) {
@@ -4561,7 +4697,9 @@ void App::rebuildSettingsMenuItems() {
       settingsMenuItems_.push_back(uiText(UiText::Punctuation) + ": " +
                                    pacingDelayLabel(pacingPunctuationDelayMs_));
       settingsMenuItems_.push_back(uiText(UiText::ResetPacing));
-    } else if (menuScreen_ == MenuScreen::WifiSettings) {
+    }
+#ifndef RSVP_NO_WIFI
+    else if (menuScreen_ == MenuScreen::WifiSettings) {
       settingsMenuItems_.push_back(uiText(UiText::Back));
       settingsMenuItems_.push_back("Network: " +
                                    storedOrFallbackLabel(configuredWifiSsid(), "Not set"));
@@ -4586,6 +4724,7 @@ void App::rebuildSettingsMenuItems() {
                                    storedOrFallbackLabel(configuredWifiSsid(), "Not set"));
       settingsMenuItems_.push_back("Forget network");
     }
+#endif
 
     if (settingsSelectedIndex_ >= settingsMenuItems_.size()) {
       settingsSelectedIndex_ = kSettingsBackIndex;
@@ -4598,9 +4737,13 @@ void App::rebuildSettingsMenuItems() {
     settingsMenuItems_.push_back(uiText(UiText::WordPacing));
     settingsMenuItems_.push_back(uiText(UiText::Display));
     settingsMenuItems_.push_back(uiText(UiText::TypographyTune));
+#ifndef RSVP_NO_WIFI
     settingsMenuItems_.push_back("Wi-Fi");
+#endif
     settingsMenuItems_.push_back("Battery");
+#ifndef RSVP_NO_WIFI
     settingsMenuItems_.push_back(firmwareUpdateMenuLabel());
+#endif
     settingsMenuItems_.push_back("Installed: " + firmwareVersionLabel());
   } else if (menuScreen_ == MenuScreen::SettingsDisplay) {
     settingsMenuItems_.push_back(uiText(UiText::Back));
@@ -4633,7 +4776,9 @@ void App::rebuildSettingsMenuItems() {
     settingsMenuItems_.push_back(uiText(UiText::Punctuation) + ": " +
                                  pacingDelayLabel(pacingPunctuationDelayMs_));
     settingsMenuItems_.push_back(uiText(UiText::ResetPacing));
-  } else if (menuScreen_ == MenuScreen::WifiSettings) {
+  }
+#ifndef RSVP_NO_WIFI
+  else if (menuScreen_ == MenuScreen::WifiSettings) {
     settingsMenuItems_.push_back(uiText(UiText::Back));
     settingsMenuItems_.push_back("Network: " + storedOrFallbackLabel(configuredWifiSsid(), "Not set"));
     settingsMenuItems_.push_back("Choose network");
@@ -4641,6 +4786,9 @@ void App::rebuildSettingsMenuItems() {
     settingsMenuItems_.push_back("Forget network");
     settingsMenuItems_.push_back("OTA Owner: " + otaOwnerLabel());
   } else if (menuScreen_ == MenuScreen::SettingsBattery) {
+#else
+  else if (menuScreen_ == MenuScreen::SettingsBattery) {
+#endif
     settingsMenuItems_.push_back(uiText(UiText::Back));
     settingsMenuItems_.push_back("CPU RSVP: " + cpuMhzLabel(cpuMhzPlay_));
     settingsMenuItems_.push_back("CPU scroll: " + cpuMhzLabel(cpuMhzScroll_));
@@ -4686,14 +4834,19 @@ void App::flushPendingTimeEstimateRebuild() {
 }
 
 String App::otaOwnerLabel() {
+#ifdef RSVP_NO_WIFI
+  return "";
+#else
   if (preferences_.isKey(kPrefOtaOwner)) {
     return preferences_.getString(kPrefOtaOwner, "");
   }
   OtaUpdater::Config cfg;
   otaUpdater_.loadConfig(cfg);
   return cfg.githubOwner;
+#endif
 }
 
+#ifndef RSVP_NO_WIFI
 OtaUpdater::Config App::preferredOtaConfig() {
   OtaUpdater::Config otaConfig;
   otaUpdater_.loadConfig(otaConfig);
@@ -4713,8 +4866,12 @@ OtaUpdater::Config App::preferredOtaConfig() {
 
   return otaConfig;
 }
+#endif
 
 String App::configuredWifiSsid() {
+#ifdef RSVP_NO_WIFI
+  return "";
+#else
   String ssid = preferences_.getString(kPrefWifiSsid, "");
   if (ssid.isEmpty()) {
     OtaUpdater::Config otaConfig;
@@ -4723,9 +4880,13 @@ String App::configuredWifiSsid() {
   }
   ssid.trim();
   return ssid;
+#endif
 }
 
 bool App::otaAutoCheckEnabled() {
+#ifdef RSVP_NO_WIFI
+  return false;
+#else
   if (preferences_.isKey(kPrefOtaAuto)) {
     return preferences_.getBool(kPrefOtaAuto, false);
   }
@@ -4733,9 +4894,13 @@ bool App::otaAutoCheckEnabled() {
   OtaUpdater::Config otaConfig;
   otaUpdater_.loadConfig(otaConfig);
   return otaConfig.autoCheck;
+#endif
 }
 
 void App::maybeAutoCheckForUpdates(uint32_t nowMs) {
+#ifdef RSVP_NO_WIFI
+  (void)nowMs;
+#else
   (void)nowMs;
   OtaUpdater::Config otaConfig = preferredOtaConfig();
   if (!otaConfig.autoCheck || !otaUpdater_.isConfigured(otaConfig)) {
@@ -4744,8 +4909,10 @@ void App::maybeAutoCheckForUpdates(uint32_t nowMs) {
 
   Serial.println("[ota] auto-check enabled");
   startBackgroundOtaCheck(otaConfig);
+#endif
 }
 
+#ifndef RSVP_NO_WIFI
 bool App::startBackgroundOtaCheck(const OtaUpdater::Config &config) {
   if (otaCheckInProgress_) {
     Serial.println("[ota] background check already running");
@@ -4811,8 +4978,12 @@ void App::otaCheckTask(void *params) {
   delete taskParams;
   vTaskDelete(nullptr);
 }
+#endif
 
 void App::pollOtaCheckResult(uint32_t nowMs) {
+#ifdef RSVP_NO_WIFI
+  (void)nowMs;
+#else
   (void)nowMs;
   if (otaCheckQueue_ == nullptr) {
     return;
@@ -4832,13 +5003,21 @@ void App::pollOtaCheckResult(uint32_t nowMs) {
       otaUpdatePromptPending_ = true;
     }
   }
+#endif
 }
 
 bool App::updateConfirmCanOpen() const {
+#ifdef RSVP_NO_WIFI
+  return false;
+#else
   return otaUpdatePromptPending_ && !pendingBootBookLoad_ && state_ == AppState::Paused;
+#endif
 }
 
 void App::maybeOpenUpdateConfirm(uint32_t nowMs) {
+#ifdef RSVP_NO_WIFI
+  (void)nowMs;
+#else
   if (!updateConfirmCanOpen()) {
     return;
   }
@@ -4846,9 +5025,15 @@ void App::maybeOpenUpdateConfirm(uint32_t nowMs) {
   otaUpdatePromptPending_ = false;
   setState(AppState::Menu, nowMs);
   openUpdateConfirm();
+#endif
 }
 
 bool App::blockNetworkActionForOtaCheck(const String &title, uint32_t nowMs) {
+#ifdef RSVP_NO_WIFI
+  (void)title;
+  (void)nowMs;
+  return false;
+#else
   pollOtaCheckResult(nowMs);
   if (!otaCheckInProgress_) {
     return false;
@@ -4858,8 +5043,10 @@ bool App::blockNetworkActionForOtaCheck(const String &title, uint32_t nowMs) {
   delay(1200);
   renderMenu();
   return true;
+#endif
 }
 
+#ifndef RSVP_NO_WIFI
 void App::runFirmwareUpdate(const OtaUpdater::Config &config, bool automatic, uint32_t nowMs) {
   if (blockNetworkActionForOtaCheck("OTA", nowMs)) {
     return;
@@ -4914,8 +5101,12 @@ void App::runFirmwareUpdate(const OtaUpdater::Config &config, bool automatic, ui
     setState(AppState::Paused, nowMs);
   }
 }
+#endif
 
 void App::runRssFeedCheck(uint32_t nowMs) {
+#ifdef RSVP_NO_WIFI
+  (void)nowMs;
+#else
   (void)nowMs;
   if (blockNetworkActionForOtaCheck("RSS", nowMs)) {
     return;
@@ -4941,6 +5132,7 @@ void App::runRssFeedCheck(uint32_t nowMs) {
     return;
   }
   renderMainMenu();
+#endif
 }
 
 String App::pacingDelayLabel(uint16_t delayMs) const { return String(delayMs) + " ms"; }
@@ -5290,6 +5482,11 @@ void App::openUpdateConfirm() {
 }
 
 void App::selectUpdateConfirmItem(uint32_t nowMs) {
+#ifdef RSVP_NO_WIFI
+  menuScreen_ = MenuScreen::Main;
+  setState(AppState::Paused, nowMs);
+  return;
+#else
   if (updateConfirmSelectedIndex_ != UpdateConfirmUpdate) {
     Serial.println("[ota] update skipped by user");
     menuScreen_ = MenuScreen::Main;
@@ -5299,6 +5496,7 @@ void App::selectUpdateConfirmItem(uint32_t nowMs) {
 
   Serial.println("[ota] update confirmed by user");
   runFirmwareUpdate(preferredOtaConfig(), false, nowMs);
+#endif
 }
 
 void App::openPowerOffConfirm(uint32_t nowMs) {
@@ -5352,6 +5550,9 @@ void App::selectPowerOffConfirmItem(uint32_t nowMs) {
 }
 
 void App::enterCompanionSync(uint32_t nowMs) {
+#ifdef RSVP_NO_WIFI
+  (void)nowMs;
+#else
   if (blockNetworkActionForOtaCheck("Sync", nowMs)) {
     return;
   }
@@ -5379,9 +5580,13 @@ void App::enterCompanionSync(uint32_t nowMs) {
 
   lastCompanionSyncRenderMs_ = 0;
   setState(AppState::CompanionSync, nowMs);
+#endif
 }
 
 void App::updateCompanionSync(uint32_t nowMs) {
+#ifdef RSVP_NO_WIFI
+  (void)nowMs;
+#else
   companionSync_.update();
 
   if (powerButton_.isHeld() && nowMs - powerButton_.lastEdgeMs() >= kUsbTransferExitHoldMs) {
@@ -5394,9 +5599,13 @@ void App::updateCompanionSync(uint32_t nowMs) {
     lastCompanionSyncRenderMs_ = nowMs;
     display_.renderStatus("Sync", companionSync_.statusLine1(), companionSync_.statusLine2());
   }
+#endif
 }
 
 void App::exitCompanionSync(uint32_t nowMs) {
+#ifdef RSVP_NO_WIFI
+  (void)nowMs;
+#else
   Serial.println("[app] leaving companion sync mode");
   display_.renderStatus("Sync", "Stopping", "");
   companionSync_.end();
@@ -5406,11 +5615,12 @@ void App::exitCompanionSync(uint32_t nowMs) {
   storage_.refreshBooks();
   menuScreen_ = MenuScreen::Main;
   setState(AppState::Paused, nowMs);
+#endif
 }
 
 void App::runSdCardCheck(uint32_t nowMs) {
   (void)nowMs;
-  Serial.println("[app] running SD card check");
+  Serial.println("[app] running storage check");
   display_.renderStatus("SD check", "Starting", "");
   const StorageManager::DiagnosticResult result = storage_.diagnoseSdCard();
 
@@ -5547,8 +5757,8 @@ void App::exitUsbTransfer(uint32_t nowMs) {
         Serial.println("[app] current indexed book unavailable after USB transfer");
         usingStorageBook_ = false;
         currentBookPath_ = "";
-        currentBookTitle_ = "Demo";
         reader_.clearLoadedBook(nowMs);
+        currentBookTitle_ = "Demo";
         reader_.begin(nowMs);
       }
     } else if (storage_.bookCount() > 0) {
@@ -5884,8 +6094,8 @@ void App::wakeFromSleep(bool fullPeripheralReset) {
       Serial.println("[app] current indexed book unavailable after wake");
       usingStorageBook_ = false;
       currentBookPath_ = "";
-      currentBookTitle_ = "Demo";
       reader_.clearLoadedBook(nowMs);
+      currentBookTitle_ = "Demo";
       reader_.begin(nowMs);
     }
   }
@@ -6093,7 +6303,7 @@ bool App::loadBookAtIndex(size_t index, uint32_t nowMs,
   }
 
   lastProgressSaveMs_ = nowMs;
-  Serial.printf("[app] loaded SD book[%u/%u]: %s (%u chapters, %u paragraphs)\n",
+  Serial.printf("[app] loaded storage book[%u/%u]: %s (%u chapters, %u paragraphs)\n",
                 static_cast<unsigned int>(loadedIndex + 1),
                 static_cast<unsigned int>(storage_.bookCount()), loadedPath.c_str(),
                 static_cast<unsigned int>(chapterMarkers_.size()),
@@ -6255,10 +6465,9 @@ void App::renderMainMenu() {
   items.push_back("Focus Timer");
   items.push_back(uiText(UiText::Settings));
   items.push_back("SD card check");
+#ifndef RSVP_NO_WIFI
   items.push_back("RSS feeds");
   items.push_back("Companion sync");
-#if RSVP_USB_TRANSFER_ENABLED
-  items.push_back(uiText(UiText::UsbTransfer));
 #endif
   items.push_back(uiText(UiText::PowerOff));
   display_.renderMenu(items, menuSelectedIndex_);
@@ -6269,7 +6478,9 @@ void App::renderArticlesMenu() {
   items.reserve(ArticlesItemCount);
   items.push_back(uiText(UiText::Back));
   items.push_back("Browse articles");
+#ifndef RSVP_NO_WIFI
   items.push_back("Update RSS");
+#endif
   display_.renderMenu(items, articlesSelectedIndex_);
 }
 
@@ -6352,6 +6563,9 @@ void App::renderSdCardRepairConfirm() {
 }
 
 void App::renderUpdateConfirm() {
+#ifdef RSVP_NO_WIFI
+  display_.renderStatus("OTA", "Disabled", "");
+#else
   std::vector<String> items;
   items.reserve(UpdateConfirmItemCount + kUpdateConfirmHeaderRows);
   items.push_back("Update available");
@@ -6360,6 +6574,7 @@ void App::renderUpdateConfirm() {
   items.push_back("Update");
 
   display_.renderMenu(items, updateConfirmSelectedIndex_ + kUpdateConfirmHeaderRows);
+#endif
 }
 
 void App::renderPowerOffConfirm() {
@@ -6378,7 +6593,9 @@ void App::renderQuickSettings() {
   items.push_back(String("Brightness: ") + String(currentBrightnessPercent()) + "%");
   items.push_back(String("Theme: ") + themeModeLabel());
   items.push_back("Focus Timer");
+#ifndef RSVP_NO_WIFI
   items.push_back("Sync");
+#endif
   display_.renderMenu(items, quickSettingsSelectedIndex_);
 }
 
@@ -6386,7 +6603,6 @@ void App::renderQuickSync() {
   std::vector<String> items;
   items.reserve(QuickSyncItemCount);
   items.push_back("Wi-Fi Sync");
-  items.push_back("USB Sync");
   display_.renderMenu(items, quickSyncSelectedIndex_);
 }
 
@@ -6645,6 +6861,10 @@ String App::currentBatteryLabel() const {
   if (!batteryPresent_ || !batterySampleInitialized_) {
     return "";
   }
+
+#if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
+  return batteryTimeRemainingLabel();
+#endif
 
   if (batteryLabelMode_ == BatteryLabelMode::TimeRemaining) {
     return batteryTimeRemainingLabel();
@@ -7265,6 +7485,8 @@ void App::handleCurrentBookReadFailure(uint32_t nowMs, const char *detail) {
   paragraphStarts_.clear();
   currentBookPath_ = "";
   currentBookTitle_ = "Demo";
+  reader_.clearLoadedBook(nowMs);
+  reader_.begin(nowMs);
   usingStorageBook_ = false;
   contextViewVisible_ = false;
   wpmFeedbackVisible_ = false;

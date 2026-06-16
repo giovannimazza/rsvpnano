@@ -16,14 +16,20 @@
 #include "input/InputButtons.h"
 #include "input/InputTouch.h"
 #include "reader/ReadingLoop.h"
+#ifndef RSVP_NO_WIFI
 #include "rss/RssFeedManager.h"
+#endif
 #include "standby/Screensaver.h"
 #include "storage/index/IndexedBookStore.h"
 #include "storage/StorageManager.h"
+#ifndef RSVP_NO_WIFI
 #include "sync/CompanionSyncManager.h"
+#endif
 #include "timer/FocusTimer.h"
 #include "ui/Localization.h"
+#ifndef RSVP_NO_WIFI
 #include "update/OtaUpdater.h"
+#endif
 #include "usb/UsbMassStorageManager.h"
 
 using TouchEvent = Input::Touch::Event;
@@ -47,6 +53,7 @@ class App {
   void update(uint32_t nowMs);
 
  private:
+ #ifndef RSVP_NO_WIFI
   static constexpr size_t kOtaVersionLabelMax = 32;
   static constexpr size_t kOtaSummaryLabelMax = 40;
   static constexpr size_t kOtaDetailLabelMax = 96;
@@ -63,6 +70,7 @@ class App {
     OtaUpdater::Config config;
     QueueHandle_t resultQueue = nullptr;
   };
+ #endif
 
   struct PausedTouchSession {
     bool active = false;
@@ -135,7 +143,9 @@ class App {
   enum class TextEntryPurpose : uint8_t {
     None,
     WifiPassword,
+#ifndef RSVP_NO_WIFI
     OtaOwner,
+#endif
   };
 
   enum class KeyboardMode : uint8_t {
@@ -232,6 +242,7 @@ class App {
   bool isFooterMetricTap(uint16_t x, uint16_t y) const;
   bool isBatteryBadgeTap(uint16_t x, uint16_t y) const;
   bool isPreviousSentenceTap(uint16_t x, uint16_t y) const;
+  bool isWpmSwipeTap(uint16_t y) const;
   bool isActivelyReading() const;
   bool readerFooterVisible() const;
   DisplayManager::ReaderChrome readerChrome() const;
@@ -276,15 +287,19 @@ class App {
   void rebuildSettingsMenuItems();
   void applyPacingSettings();
   void maybeAutoCheckForUpdates(uint32_t nowMs);
+#ifndef RSVP_NO_WIFI
   bool startBackgroundOtaCheck(const OtaUpdater::Config &config);
   static void otaCheckTask(void *params);
+#endif
   void pollOtaCheckResult(uint32_t nowMs);
   void maybeOpenUpdateConfirm(uint32_t nowMs);
   bool updateConfirmCanOpen() const;
   bool blockNetworkActionForOtaCheck(const String &title, uint32_t nowMs);
+#ifndef RSVP_NO_WIFI
   void runFirmwareUpdate(const OtaUpdater::Config &config, bool automatic, uint32_t nowMs);
-  void runRssFeedCheck(uint32_t nowMs);
   OtaUpdater::Config preferredOtaConfig();
+#endif
+  void runRssFeedCheck(uint32_t nowMs);
   void scanWifiNetworks();
   void renderWifiNetworks();
   void selectWifiNetworkItem(uint32_t nowMs);
@@ -470,9 +485,11 @@ class App {
   Input::Buttons::Button keyButton_;
   StorageManager storage_;
   IndexedBookStore activeBookStore_;
+#ifndef RSVP_NO_WIFI
   OtaUpdater otaUpdater_;
   RssFeedManager rssFeedManager_;
   CompanionSyncManager companionSync_;
+#endif
   UsbMassStorageManager usbTransfer_;
   Preferences preferences_;
   PausedTouchSession pausedTouch_;

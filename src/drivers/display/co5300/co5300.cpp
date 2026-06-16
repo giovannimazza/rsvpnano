@@ -10,6 +10,15 @@
 namespace {
 
 constexpr int kSpiFrequency = 20000000;
+#if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
+constexpr uint16_t kColumnOffset = 6;
+constexpr uint16_t kRowOffset = 0;
+constexpr uint8_t kDriveStrength = 0xAB;
+#else
+constexpr uint16_t kColumnOffset = 0;
+constexpr uint16_t kRowOffset = 0;
+constexpr uint8_t kDriveStrength = 0xFF;
+#endif
 constexpr int kSendBufferRows =
     Board::Config::DISPLAY_TX_CHUNK_BYTES /
     (Board::Config::PANEL_NATIVE_WIDTH * static_cast<int>(sizeof(uint16_t)));
@@ -29,6 +38,38 @@ struct LcdCommand {
 // Keep the panel memory in its native orientation and let the shared mapping layer handle the
 // landscape transform, just like the stabilized 2.41 port.
 constexpr uint8_t kDefaultMadctl = Board::Config::UI_ROTATED_180 ? 0xC0 : 0x00;
+constexpr uint16_t kPanelColumnStart = kColumnOffset;
+constexpr uint16_t kPanelColumnEnd = static_cast<uint16_t>(kColumnOffset + Board::Config::PANEL_NATIVE_WIDTH - 1);
+constexpr uint16_t kPanelRowStart = kRowOffset;
+constexpr uint16_t kPanelRowEnd = static_cast<uint16_t>(kRowOffset + Board::Config::PANEL_NATIVE_HEIGHT - 1);
+#if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
+constexpr LcdCommand kQspiInit[] = {
+    {0xFE, {0x20}, 1, 0},
+    {0xF4, {0x5A}, 1, 0},
+    {0xF5, {0x59}, 1, 0},
+    {0xFE, {0x80}, 1, 0},
+    {0x03, {0x00}, 1, 0},
+    {0xFE, {0x00}, 1, 0},
+    {0xC4, {0x80}, 1, 0},
+    {0x3A, {0x55}, 1, 0},
+    {0x35, {0x00}, 1, 0},
+    {0x53, {0x20}, 1, 0},
+    {0x51, {0xFF}, 1, 0},
+    {0x63, {kDriveStrength}, 1, 0},
+    {0x2A,
+     {static_cast<uint8_t>(kPanelColumnStart >> 8), static_cast<uint8_t>(kPanelColumnStart),
+      static_cast<uint8_t>(kPanelColumnEnd >> 8), static_cast<uint8_t>(kPanelColumnEnd)},
+     4,
+     0},
+    {0x2B,
+     {static_cast<uint8_t>(kPanelRowStart >> 8), static_cast<uint8_t>(kPanelRowStart),
+      static_cast<uint8_t>(kPanelRowEnd >> 8), static_cast<uint8_t>(kPanelRowEnd)},
+     4,
+     0},
+    {0x11, {0x00}, 0, 100},
+    {0x29, {0x00}, 0, 0},
+};
+#else
 constexpr LcdCommand kQspiInit[] = {
     {0x11, {0x00}, 0, 120},
     {0xFE, {0x20}, 1, 0},
@@ -40,12 +81,21 @@ constexpr LcdCommand kQspiInit[] = {
     {0x35, {0x00}, 1, 0},
     {0x53, {0x20}, 1, 0},
     {0x51, {0xFF}, 1, 0},
-    {0x63, {0xFF}, 1, 0},
-    {0x2A, {0x00, 0x00, 0x01, 0xDF}, 4, 0},
-    {0x2B, {0x00, 0x00, 0x01, 0xDF}, 4, 0},
+    {0x63, {kDriveStrength}, 1, 0},
+    {0x2A,
+     {static_cast<uint8_t>(kPanelColumnStart >> 8), static_cast<uint8_t>(kPanelColumnStart),
+      static_cast<uint8_t>(kPanelColumnEnd >> 8), static_cast<uint8_t>(kPanelColumnEnd)},
+     4,
+     0},
+    {0x2B,
+     {static_cast<uint8_t>(kPanelRowStart >> 8), static_cast<uint8_t>(kPanelRowStart),
+      static_cast<uint8_t>(kPanelRowEnd >> 8), static_cast<uint8_t>(kPanelRowEnd)},
+     4,
+     0},
     {0x36, {kDefaultMadctl}, 1, 0},
     {0x29, {0x00}, 0, 10},
 };
+#endif
 
 void sendCommand(Co5300::Context &context, uint8_t command, const uint8_t *data,
                  uint32_t length) {
@@ -54,6 +104,7 @@ void sendCommand(Co5300::Context &context, uint8_t command, const uint8_t *data,
   }
 
   spi_transaction_t transaction = {};
+  transaction.flags = SPI_TRANS_MULTILINE_CMD | SPI_TRANS_MULTILINE_ADDR;
   transaction.cmd = 0x02;
   transaction.addr = static_cast<uint32_t>(command) << 8;
   if (length != 0) {
@@ -65,6 +116,8 @@ void sendCommand(Co5300::Context &context, uint8_t command, const uint8_t *data,
 }
 
 void setColumnWindow(Co5300::Context &context, uint16_t x1, uint16_t x2) {
+  x1 = static_cast<uint16_t>(x1 + kColumnOffset);
+  x2 = static_cast<uint16_t>(x2 + kColumnOffset);
   const uint8_t data[] = {
       static_cast<uint8_t>(x1 >> 8),
       static_cast<uint8_t>(x1),
@@ -75,6 +128,8 @@ void setColumnWindow(Co5300::Context &context, uint16_t x1, uint16_t x2) {
 }
 
 void setRowWindow(Co5300::Context &context, uint16_t y1, uint16_t y2) {
+  y1 = static_cast<uint16_t>(y1 + kRowOffset);
+  y2 = static_cast<uint16_t>(y2 + kRowOffset);
   const uint8_t data[] = {
       static_cast<uint8_t>(y1 >> 8),
       static_cast<uint8_t>(y1),
@@ -182,9 +237,15 @@ void pushColors(Context &context, uint16_t x, uint16_t y, uint16_t width, uint16
   size_t pixelsRemaining = static_cast<size_t>(width) * height;
   const uint16_t *cursor = data;
 
+#if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
+  // The 1.43 panel is sensitive to per-transfer row-window updates and variable command/address
+  // widths; keep the legacy streaming sequence that is known-good on this hardware.
+  setColumnWindow(context, x, static_cast<uint16_t>(x + width - 1));
+#else
   setColumnWindow(context, x, static_cast<uint16_t>(x + width - 1));
   setRowWindow(context, y, static_cast<uint16_t>(y + height - 1));
   sendCommand(context, kRamWriteCommand, nullptr, 0);
+#endif
 
   while (pixelsRemaining > 0) {
     size_t chunkPixels = pixelsRemaining;
@@ -193,11 +254,27 @@ void pushColors(Context &context, uint16_t x, uint16_t y, uint16_t width, uint16
     }
 
     spi_transaction_ext_t transaction = {};
+#if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
+    if (firstSend) {
+      transaction.base.flags = SPI_TRANS_MODE_QIO;
+      transaction.base.cmd = 0x32;
+      transaction.base.addr = y == 0 ? 0x002C00 : 0x003C00;
+      firstSend = false;
+    } else {
+      transaction.base.flags =
+          SPI_TRANS_MODE_QIO | SPI_TRANS_VARIABLE_CMD | SPI_TRANS_VARIABLE_ADDR |
+          SPI_TRANS_VARIABLE_DUMMY;
+      transaction.command_bits = 0;
+      transaction.address_bits = 0;
+      transaction.dummy_bits = 0;
+    }
+#else
     transaction.base.flags = SPI_TRANS_MODE_QIO;
     transaction.base.cmd = 0x32;
     transaction.base.addr = static_cast<uint32_t>(firstSend ? kRamWriteCommand
                                                             : kRamWriteContinueCommand)
                             << 8;
+#endif
     transaction.base.tx_buffer = cursor;
     transaction.base.length = chunkPixels * 16;
 
@@ -205,7 +282,9 @@ void pushColors(Context &context, uint16_t x, uint16_t y, uint16_t width, uint16
         spi_device_polling_transmit(context.spi,
                                     reinterpret_cast<spi_transaction_t *>(&transaction)));
 
+#if !defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
     firstSend = false;
+#endif
     pixelsRemaining -= chunkPixels;
     cursor += chunkPixels;
   }

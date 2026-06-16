@@ -64,6 +64,7 @@ class DisplayManager {
   void setBatteryLabel(const String &label);
   void setBrightnessOverlay(const String &text);
   void setBrightnessPercent(uint8_t percent);
+  void invalidateRenderCache();
   void setDarkMode(bool darkMode);
   void setNightMode(bool nightMode);
   void setYellowMode(bool enabled);
@@ -178,7 +179,7 @@ class DisplayManager {
   void drawPreviousSentenceHint();
   void drawEdgeMenuHints(int logicalWidth, int logicalHeight, const ReaderChrome &chrome);
   void drawFooter(const String &chapterLabel, const String &statusLabel,
-                  const ReaderChrome &chrome);
+                  const ReaderChrome &chrome, int footerY = -1);
   void drawRsvpAnchorGuide(int anchorX, int textY, int textHeight);
   void drawWordAt(const String &word, int x, int y, uint16_t color);
   void drawRsvpWordAt(const String &word, int x, int y, int focusIndex);
