@@ -159,7 +159,9 @@ enum RestructuredMenuItem : size_t {
   RestructuredMenuResume,
   RestructuredMenuChapters,
   RestructuredMenuBooks,
+#if !defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
   RestructuredMenuArticles,
+#endif
   RestructuredMenuSettings,
   RestructuredMenuPowerOff,
   RestructuredMenuItemCount,
@@ -232,7 +234,9 @@ enum PowerOffConfirmItem : size_t {
 enum QuickSettingsItem : size_t {
   QuickSettingsBrightness,
   QuickSettingsTheme,
+#if !defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
   QuickSettingsFocusTimer,
+#endif
 #ifndef RSVP_NO_WIFI
   QuickSettingsSync,
 #endif
@@ -3175,9 +3179,11 @@ bool App::moveMenuSelection(int direction, bool wrap) {
       case QuickSettingsTheme:
         selectedLabel = "Theme";
         break;
+#if !defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
       case QuickSettingsFocusTimer:
         selectedLabel = "Focus Timer";
         break;
+#endif
 #ifndef RSVP_NO_WIFI
       case QuickSettingsSync:
         selectedLabel = "Sync";
@@ -3206,9 +3212,11 @@ bool App::moveMenuSelection(int direction, bool wrap) {
         case RestructuredMenuBooks:
           selectedLabel = "Books";
           break;
+#if !defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
         case RestructuredMenuArticles:
           selectedLabel = "Articles";
           break;
+#endif
         case RestructuredMenuSettings:
           selectedLabel = uiText(UiText::Settings);
           break;
@@ -3330,9 +3338,11 @@ void App::selectMenuItem(uint32_t nowMs) {
       case RestructuredMenuBooks:
         openBookPicker(false);
         return;
+#if !defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
       case RestructuredMenuArticles:
         openArticlesMenu();
         return;
+#endif
       case RestructuredMenuSettings:
         openSettings();
         return;
@@ -3417,9 +3427,11 @@ void App::selectQuickSettingsItem(uint32_t nowMs) {
     case QuickSettingsTheme:
       cycleThemeMode(nowMs);
       return;
+#if !defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
     case QuickSettingsFocusTimer:
       openFocusTimer();
       return;
+#endif
 #ifndef RSVP_NO_WIFI
     case QuickSettingsSync:
       openQuickSync();
@@ -4684,7 +4696,9 @@ void App::rebuildSettingsMenuItems() {
       settingsMenuItems_.push_back(firmwareUpdateMenuLabel());
 #endif
       settingsMenuItems_.push_back("Installed: " + firmwareVersionLabel());
+#if !defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
       settingsMenuItems_.push_back("SD card check");
+#endif
     } else if (menuScreen_ == MenuScreen::SettingsDisplay) {
       settingsMenuItems_.push_back(uiText(UiText::Back));
       settingsMenuItems_.push_back("Theme: " + themeModeLabel());
@@ -4763,6 +4777,9 @@ void App::rebuildSettingsMenuItems() {
     settingsMenuItems_.push_back(firmwareUpdateMenuLabel());
 #endif
     settingsMenuItems_.push_back("Installed: " + firmwareVersionLabel());
+#if !defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
+    settingsMenuItems_.push_back("SD card check");
+#endif
   } else if (menuScreen_ == MenuScreen::SettingsDisplay) {
     settingsMenuItems_.push_back(uiText(UiText::Back));
     settingsMenuItems_.push_back("Display mode: " + themeModeLabel());
@@ -6472,7 +6489,9 @@ void App::renderMainMenu() {
   items.push_back(uiText(UiText::Resume));
   items.push_back(uiText(UiText::Chapters));
   items.push_back("Books");
+#if !defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
   items.push_back("Articles");
+#endif
   if (Board::Config::ENABLE_RESTRUCTURED_MENU) {
     items.push_back(uiText(UiText::Settings));
     items.push_back(uiText(UiText::PowerOff));
@@ -6610,7 +6629,9 @@ void App::renderQuickSettings() {
   items.reserve(QuickSettingsItemCount);
   items.push_back(String("Brightness: ") + String(currentBrightnessPercent()) + "%");
   items.push_back(String("Theme: ") + themeModeLabel());
+#if !defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
   items.push_back("Focus Timer");
+#endif
 #ifndef RSVP_NO_WIFI
   items.push_back("Sync");
 #endif
