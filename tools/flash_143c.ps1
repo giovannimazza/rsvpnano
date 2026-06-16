@@ -6,9 +6,9 @@ $env_name   = "waveshare_esp32s3_touch_amoled_143c"
 $stale      = "src\storage\SeedBooks.generated.h"
 $data_dir   = "data"
 
-# LittleFS partition size from partitions_143c.csv (0x260000 bytes)
+# LittleFS partition size from partitions_143c.csv (0x4E0000 = ~4.875MB, factory layout)
 # Reserve ~10% for LittleFS metadata/journal overhead
-$partition_bytes = 0x260000
+$partition_bytes = 0x4E0000
 $usable_bytes    = [int]($partition_bytes * 0.90)
 
 # Remove stale generated file if left over from old builds
