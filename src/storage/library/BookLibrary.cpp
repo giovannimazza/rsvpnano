@@ -44,20 +44,27 @@ namespace BookLibrary {
                     if (dir) {
                         dir.close();
                     }
+                    Serial.printf("[book-scan] dir open failed: %s\n", directoryPath);
                     return;
                 }
 
+                size_t count = 0;
                 for (File entry = dir.openNextFile(); entry; entry = dir.openNextFile()) {
                     if (!entry.isDirectory()) {
                         const String name = StoragePaths::displayNameForPath(String(entry.name()));
+                        Serial.printf("[book-scan] found: %s size=%lu\n", entry.name(),
+                                      static_cast<unsigned long>(entry.size()));
 
-                        if (!name.isEmpty())
+                        if (!name.isEmpty()) {
                             entries.push_back(makeEntryInfo(directoryPath, name, static_cast<size_t>(entry.size())));
+                            ++count;
+                        }
                     }
 
                     entry.close();
                 }
 
+                Serial.printf("[book-scan] dir %s: %u entries\n", directoryPath, static_cast<unsigned>(count));
                 dir.close();
             };
 
