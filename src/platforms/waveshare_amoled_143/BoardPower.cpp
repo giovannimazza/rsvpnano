@@ -1,17 +1,30 @@
 #include "board/BoardPower.h"
 
+#include <Wire.h>
 #include <driver/gpio.h>
 #include <algorithm>
 
 #include "drivers/power/BatteryCurve.h"
+#include "drivers/power/axp2101/Axp2101.h"
 
 namespace {
 
 struct PowerContext {
   bool batteryPowerHoldEnabled = false;
+  bool axp2101Detected = false;
+  bool axp2101Probed = false;
 };
 
 PowerContext gPower;
+
+bool probeAxp2101() {
+  constexpr uint8_t kAxpAddress = 0x34;
+  Wire.beginTransmission(kAxpAddress);
+  const uint8_t err = Wire.endTransmission(true);
+  const bool found = (err == 0);
+  Serial.printf("[board] AXP2101 probe addr=0x%02X err=%u found=%u\n", kAxpAddress, err, found ? 1 : 0);
+  return found;
+}
 
 }  // namespace
 
@@ -54,6 +67,20 @@ bool enableAudioPowerIfAvailable() { return false; }
 
 bool readBatteryStatus(BatteryStatus &status) {
   status = BatteryStatus{};
+
+  // On first call, probe for AXP2101 on the Wire bus.
+  if (!gPower.axp2101Probed) {
+    gPower.axp2101Probed = true;
+    gPower.axp2101Detected = probeAxp2101();
+    if (gPower.axp2101Detected) {
+      BoardDrivers::Axp2101::begin();
+    }
+  }
+
+  if (gPower.axp2101Detected) {
+    return BoardDrivers::Axp2101::readBatteryStatus(status);
+  }
+
   if (Config::PIN_BATTERY_ADC < 0) {
     return false;
   }
@@ -74,15 +101,15 @@ bool readBatteryStatus(BatteryStatus &status) {
     delayMicroseconds(500);
   }
 
+  float pinMillivolts = 0.0f;
   if (samples == 0) {
     uint32_t rawTotal = 0;
     for (uint8_t i = 0; i < kRawSamples; ++i) {
       rawTotal += analogRead(Config::PIN_BATTERY_ADC);
       delayMicroseconds(500);
     }
-    const float pinMillivolts =
+    pinMillivolts =
         (static_cast<float>(rawTotal) / static_cast<float>(kRawSamples)) * 3300.0f / 4095.0f;
-    status.voltage = (pinMillivolts * kBatteryDividerRatio / 1000.0f) + kBatteryVoltageOffset;
   } else {
     std::sort(millivolts, millivolts + samples);
     const uint8_t trim = samples >= 10 ? 2 : 0;
@@ -92,10 +119,14 @@ bool readBatteryStatus(BatteryStatus &status) {
       trimmedTotal += millivolts[i];
       ++trimmedSamples;
     }
-    const float pinMillivolts =
+    pinMillivolts =
         static_cast<float>(trimmedTotal) / static_cast<float>(std::max<uint8_t>(1, trimmedSamples));
-    status.voltage = (pinMillivolts * kBatteryDividerRatio / 1000.0f) + kBatteryVoltageOffset;
   }
+
+  status.voltage = (pinMillivolts * kBatteryDividerRatio / 1000.0f) + kBatteryVoltageOffset;
+  Serial.printf("[board] battery ADC pin=%d samples=%u pin_mv=%.1f voltage=%.2fV\n",
+                Config::PIN_BATTERY_ADC, samples, static_cast<double>(pinMillivolts),
+                static_cast<double>(status.voltage));
 
   status.present = status.voltage >= 2.5f && status.voltage <= 4.6f;
   if (!status.present) {
@@ -107,9 +138,19 @@ bool readBatteryStatus(BatteryStatus &status) {
   return true;
 }
 
-DiagnosticSnapshot diagnosticSnapshot() { return PowerDiagnosticSnapshot{}; }
+DiagnosticSnapshot diagnosticSnapshot() {
+  if (gPower.axp2101Detected) {
+    return BoardDrivers::Axp2101::diagnosticSnapshot();
+  }
+  return PowerDiagnosticSnapshot{};
+}
 
-bool externalPowerPresent() { return false; }
+bool externalPowerPresent() {
+  if (gPower.axp2101Detected) {
+    return BoardDrivers::Axp2101::externalPowerPresent();
+  }
+  return false;
+}
 
 bool releaseBatteryPowerHold() {
   if (Config::PIN_BATTERY_HOLD < 0) {
