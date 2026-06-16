@@ -236,7 +236,6 @@ enum QuickSettingsItem : size_t {
 #ifndef RSVP_NO_WIFI
   QuickSettingsSync,
 #endif
-  QuickSettingsBattery,
   QuickSettingsItemCount,
 };
 
@@ -2259,7 +2258,13 @@ void App::updateBatteryRuntimeLabel(uint32_t nowMs) {
       batteryRuntimeMinutesRemaining_ > elapsedSinceSampleMinutes
           ? batteryRuntimeMinutesRemaining_ - elapsedSinceSampleMinutes
           : 0;
-  const String nextLabel = formatBatteryTimeRemaining(projectedMinutes);
+  const String nextLabel =
+#if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
+      formatBatteryTimeRemaining(projectedMinutes) + " - " +
+      String(static_cast<unsigned int>(batteryDisplayedPercent_)) + "%";
+#else
+      formatBatteryTimeRemaining(projectedMinutes);
+#endif
   if (nextLabel == batteryLabel_) {
     return;
   }
@@ -3178,9 +3183,6 @@ bool App::moveMenuSelection(int direction, bool wrap) {
         selectedLabel = "Sync";
         break;
 #endif
-      case QuickSettingsBattery:
-        selectedLabel = "Battery";
-        break;
       default:
         break;
     }
@@ -6612,12 +6614,6 @@ void App::renderQuickSettings() {
 #ifndef RSVP_NO_WIFI
   items.push_back("Sync");
 #endif
-  if (batteryPresent_ && batterySampleInitialized_) {
-    const String timeLabel = batteryTimeRemainingLabel();
-    items.push_back(String("Battery: ") + String(static_cast<unsigned int>(batteryDisplayedPercent_)) + "% ~" + timeLabel);
-  } else {
-    items.push_back("Battery: --");
-  }
   display_.renderMenu(items, quickSettingsSelectedIndex_);
 }
 
@@ -6885,7 +6881,8 @@ String App::currentBatteryLabel() const {
   }
 
 #if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
-  return batteryTimeRemainingLabel();
+  return batteryTimeRemainingLabel() + " - " +
+         String(static_cast<unsigned int>(batteryDisplayedPercent_)) + "%";
 #endif
 
   if (batteryLabelMode_ == BatteryLabelMode::TimeRemaining) {
