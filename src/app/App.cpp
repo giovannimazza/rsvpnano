@@ -2232,8 +2232,13 @@ void App::restoreFromAutoDim(uint32_t nowMs) {
 }
 
 void App::updateBatteryRuntimeLabel(uint32_t nowMs) {
-  if (!batteryPresent_ || !batterySampleInitialized_ ||
-      batteryLabelMode_ != BatteryLabelMode::TimeRemaining || !batteryRuntimeEstimateReady_) {
+#if defined(RSVP_BOARD_WAVESHARE_AMOLED_143C)
+  const bool wantsTimeRemaining = batteryRuntimeEstimateReady_;
+#else
+  const bool wantsTimeRemaining =
+      batteryLabelMode_ == BatteryLabelMode::TimeRemaining && batteryRuntimeEstimateReady_;
+#endif
+  if (!batteryPresent_ || !batterySampleInitialized_ || !wantsTimeRemaining) {
     return;
   }
 
@@ -6601,7 +6606,8 @@ void App::renderQuickSettings() {
   items.push_back("Sync");
 #endif
   if (batteryPresent_ && batterySampleInitialized_) {
-    items.push_back(String("Battery: ") + String(static_cast<unsigned int>(batteryDisplayedPercent_)) + "%");
+    const String timeLabel = batteryTimeRemainingLabel();
+    items.push_back(String("Battery: ") + String(static_cast<unsigned int>(batteryDisplayedPercent_)) + "% ~" + timeLabel);
   } else {
     items.push_back("Battery: --");
   }

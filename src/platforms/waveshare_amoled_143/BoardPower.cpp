@@ -1,6 +1,7 @@
 #include "board/BoardPower.h"
 
 #include <driver/gpio.h>
+#include <algorithm>
 
 #include "drivers/power/BatteryCurve.h"
 
@@ -57,29 +58,43 @@ bool readBatteryStatus(BatteryStatus &status) {
     return false;
   }
 
-  constexpr float kBatteryDividerScale = 0.003f;
-  uint32_t millivoltsTotal = 0;
+  constexpr uint8_t kMaxSamples = 24;
+  constexpr uint8_t kRawSamples = 16;
+  constexpr float kBatteryDividerRatio = 3.0f;
+  constexpr float kBatteryVoltageOffset = 0.0f;
+
+  delay(12);
+  uint32_t millivolts[kMaxSamples];
   uint8_t samples = 0;
-  for (uint8_t i = 0; i < 8; ++i) {
+  for (uint8_t i = 0; i < kMaxSamples + 2; ++i) {
     const uint32_t sample = analogReadMilliVolts(Config::PIN_BATTERY_ADC);
-    if (sample > 0) {
-      millivoltsTotal += sample;
-      ++samples;
+    if (i >= 2 && sample > 0 && samples < kMaxSamples) {
+      millivolts[samples++] = sample;
     }
-    delayMicroseconds(250);
+    delayMicroseconds(500);
   }
 
   if (samples == 0) {
     uint32_t rawTotal = 0;
-    for (uint8_t i = 0; i < 8; ++i) {
+    for (uint8_t i = 0; i < kRawSamples; ++i) {
       rawTotal += analogRead(Config::PIN_BATTERY_ADC);
-      delayMicroseconds(250);
+      delayMicroseconds(500);
     }
-    const float pinMillivolts = (static_cast<float>(rawTotal) / 8.0f) * 3300.0f / 4095.0f;
-    status.voltage = pinMillivolts * kBatteryDividerScale;
+    const float pinMillivolts =
+        (static_cast<float>(rawTotal) / static_cast<float>(kRawSamples)) * 3300.0f / 4095.0f;
+    status.voltage = (pinMillivolts * kBatteryDividerRatio / 1000.0f) + kBatteryVoltageOffset;
   } else {
-    const float pinMillivolts = static_cast<float>(millivoltsTotal) / samples;
-    status.voltage = pinMillivolts * kBatteryDividerScale;
+    std::sort(millivolts, millivolts + samples);
+    const uint8_t trim = samples >= 10 ? 2 : 0;
+    uint32_t trimmedTotal = 0;
+    uint8_t trimmedSamples = 0;
+    for (uint8_t i = trim; i < samples - trim; ++i) {
+      trimmedTotal += millivolts[i];
+      ++trimmedSamples;
+    }
+    const float pinMillivolts =
+        static_cast<float>(trimmedTotal) / static_cast<float>(std::max<uint8_t>(1, trimmedSamples));
+    status.voltage = (pinMillivolts * kBatteryDividerRatio / 1000.0f) + kBatteryVoltageOffset;
   }
 
   status.present = status.voltage >= 2.5f && status.voltage <= 4.6f;
