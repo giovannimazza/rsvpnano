@@ -41,6 +41,8 @@ class InternalSdMmcShim {
 
   uint8_t cardType() const { return CARD_MMC; }
   uint64_t cardSize() const { return LittleFS.totalBytes(); }
+  uint64_t usedBytes() const { return LittleFS.usedBytes(); }
+  uint64_t totalBytes() const { return LittleFS.totalBytes(); }
 
  private:
   bool mounted_ = false;

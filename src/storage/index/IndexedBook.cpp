@@ -614,6 +614,12 @@ namespace IndexedBook {
             IndexHeader header;
             bool parseFailed = false;
 
+            Serial.printf("[storage-index] pre-index heap_free=%u heap_largest=%u fs_used=%llu fs_total=%llu\n",
+                          static_cast<unsigned>(esp_get_free_heap_size()),
+                          static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_8BIT)),
+                          static_cast<unsigned long long>(SD_MMC.usedBytes()),
+                          static_cast<unsigned long long>(SD_MMC.totalBytes()));
+
             {
                 // First pass writes word data and records metadata.
                 errno = 0;
@@ -674,7 +680,14 @@ namespace IndexedBook {
                 header.dataSize = dataContext.dataSize;
 
                 if (!dataWriter.flush()) {
-                    Serial.printf("[storage-index] data sidecar flush failed: %s\n", tmpDataPath.c_str());
+                    Serial.printf("[storage-index] data sidecar flush failed: %s "
+                                  "words=%u data_size=%u heap_free=%u fs_used=%llu fs_total=%llu\n",
+                                  tmpDataPath.c_str(),
+                                  static_cast<unsigned>(dataContext.wordCount),
+                                  static_cast<unsigned>(dataContext.dataSize),
+                                  static_cast<unsigned>(esp_get_free_heap_size()),
+                                  static_cast<unsigned long long>(SD_MMC.usedBytes()),
+                                  static_cast<unsigned long long>(SD_MMC.totalBytes()));
                     parseFailed = true;
                 }
                 dataWriter.discard();
