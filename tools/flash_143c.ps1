@@ -23,7 +23,7 @@ $spaceFiles = Get-ChildItem -Path $data_dir -Recurse -File |
               Where-Object { $_.Name -match ' ' }
 if ($spaceFiles) {
     foreach ($f in $spaceFiles) {
-        $newName = $f.Name -replace ' ', '_'
+        $newName = $f.Name -replace ' ', ''
         $newPath = Join-Path $f.DirectoryName $newName
         Write-Host "   Renaming: $($f.Name) -> $newName" -ForegroundColor Yellow
         Rename-Item -Path $f.FullName -NewName $newName -Force
