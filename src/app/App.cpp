@@ -4737,7 +4737,14 @@ void App::rebuildSettingsMenuItems() {
                                    storedOrFallbackLabel(configuredWifiSsid(), "Not set"));
       settingsMenuItems_.push_back("Auto OTA: " + String(otaAutoCheckEnabled() ? "On" : "Off"));
       settingsMenuItems_.push_back("OTA Owner: " + otaOwnerLabel());
-    } else if (menuScreen_ == MenuScreen::SettingsBattery) {
+    } else if (menuScreen_ == MenuScreen::WifiNetworkSettings) {
+      settingsMenuItems_.push_back(uiText(UiText::Back));
+      settingsMenuItems_.push_back("Choose network: " +
+                                   storedOrFallbackLabel(configuredWifiSsid(), "Not set"));
+      settingsMenuItems_.push_back("Forget network");
+    }
+#endif
+    else if (menuScreen_ == MenuScreen::SettingsBattery) {
       settingsMenuItems_.push_back(uiText(UiText::Back));
       settingsMenuItems_.push_back("CPU RSVP: " + cpuMhzLabel(cpuMhzPlay_));
       settingsMenuItems_.push_back("CPU scroll: " + cpuMhzLabel(cpuMhzScroll_));
@@ -4750,13 +4757,7 @@ void App::rebuildSettingsMenuItems() {
       settingsMenuItems_.push_back(standbyLabel);
       settingsMenuItems_.push_back("Auto-dim delay: " + autoDimDelayLabel());
       settingsMenuItems_.push_back("Auto-dim level: " + autoDimBrightnessLabel());
-    } else if (menuScreen_ == MenuScreen::WifiNetworkSettings) {
-      settingsMenuItems_.push_back(uiText(UiText::Back));
-      settingsMenuItems_.push_back("Choose network: " +
-                                   storedOrFallbackLabel(configuredWifiSsid(), "Not set"));
-      settingsMenuItems_.push_back("Forget network");
     }
-#endif
 
     if (settingsSelectedIndex_ >= settingsMenuItems_.size()) {
       settingsSelectedIndex_ = kSettingsBackIndex;
