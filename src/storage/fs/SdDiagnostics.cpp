@@ -294,7 +294,10 @@ namespace SdDiagnostics {
             if (mountedFrequencyKhz != nullptr) {
                 *mountedFrequencyKhz = 0;
             }
-            Serial.println("[sd-check] internal flash mounted");
+            Serial.printf("[sd-check] internal flash mounted: used=%llu total=%llu free=%llu bytes\n",
+                          static_cast<unsigned long long>(SD_MMC.usedBytes()),
+                          static_cast<unsigned long long>(SD_MMC.totalBytes()),
+                          static_cast<unsigned long long>(SD_MMC.totalBytes() - SD_MMC.usedBytes()));
             return true;
         }
 

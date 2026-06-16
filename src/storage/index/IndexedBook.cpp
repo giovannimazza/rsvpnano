@@ -513,6 +513,27 @@ namespace IndexedBook {
             const String label = displayNameForPath(path);
             report("Indexing book", label.c_str(), "Building word index", 0);
 
+            // Estimate sidecar space needed: data sidecar (~= sourceBytes) +
+            // index sidecar (~= sourceBytes * 0.75). Require 2x headroom.
+            {
+                const uint64_t fsTotal = SD_MMC.totalBytes();
+                const uint64_t fsUsed  = SD_MMC.usedBytes();
+                const uint64_t fsFree  = (fsTotal > fsUsed) ? (fsTotal - fsUsed) : 0;
+                const uint64_t needed  = static_cast<uint64_t>(sourceBytes) * 2;
+                Serial.printf("[storage-index] space check: free=%llu needed~=%llu (source=%lu)\n",
+                              static_cast<unsigned long long>(fsFree),
+                              static_cast<unsigned long long>(needed),
+                              static_cast<unsigned long>(sourceBytes));
+                if (fsFree < needed) {
+                    source.close();
+                    Serial.printf("[storage-index] not enough space for sidecar: free=%llu needed~=%llu\n",
+                                  static_cast<unsigned long long>(fsFree),
+                                  static_cast<unsigned long long>(needed));
+                    report("Index failed", label.c_str(), "Not enough space", 100);
+                    return false;
+                }
+            }
+
             const String indexPath = indexedIndexPathFor(path);
             const String dataPath = indexedDataPathFor(path);
             const String tmpIndexPath = indexedTempPathFor(indexPath);
