@@ -87,7 +87,7 @@ bool readBatteryStatus(BatteryStatus &status) {
 
   constexpr uint8_t kMaxSamples = 24;
   constexpr uint8_t kRawSamples = 16;
-  constexpr float kBatteryDividerRatio = 3.0f;
+  constexpr float kBatteryDividerRatio = 2.0f;
   constexpr float kBatteryVoltageOffset = 0.0f;
 
   delay(12);
