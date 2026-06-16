@@ -236,6 +236,7 @@ enum QuickSettingsItem : size_t {
 #ifndef RSVP_NO_WIFI
   QuickSettingsSync,
 #endif
+  QuickSettingsBattery,
   QuickSettingsItemCount,
 };
 
@@ -3165,6 +3166,9 @@ bool App::moveMenuSelection(int direction, bool wrap) {
         selectedLabel = "Sync";
         break;
 #endif
+      case QuickSettingsBattery:
+        selectedLabel = "Battery";
+        break;
       default:
         break;
     }
@@ -6596,6 +6600,11 @@ void App::renderQuickSettings() {
 #ifndef RSVP_NO_WIFI
   items.push_back("Sync");
 #endif
+  if (batteryPresent_ && batterySampleInitialized_) {
+    items.push_back(String("Battery: ") + String(static_cast<unsigned int>(batteryDisplayedPercent_)) + "%");
+  } else {
+    items.push_back("Battery: --");
+  }
   display_.renderMenu(items, quickSettingsSelectedIndex_);
 }
 
